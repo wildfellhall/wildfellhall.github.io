@@ -2,3 +2,14 @@ body {
   font-family: "Times New Roman", Times, Serif; 
   background-color: pink; 
 }
+#banner {
+  font-weight: 400; 
+  padding-left: 5 px; 
+  padding-right: 5 px; 
+  padding-top: 5 px; 
+  padding-bottom: 5 px; 
+  margin-left: 5 px; 
+  margin-right: 5 px; 
+  margin-top: 5 px; 
+  margin-bottom: 5 px; 
+}
