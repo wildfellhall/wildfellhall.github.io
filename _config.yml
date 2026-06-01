@@ -1,0 +1,5 @@
+locale: "en-US"
+title: "wildfellhall - official website" 
+description: &description "user wildfellhall's portfolio/blog" 
+baseurl: ""
+repository: "wildfellhall/wildfellhall.github.io"
