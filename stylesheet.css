@@ -12,4 +12,8 @@ body {
   margin-right: 5 px; 
   margin-top: 5 px; 
   margin-bottom: 5 px; 
+  border-radius: 8 px; 
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
 }
