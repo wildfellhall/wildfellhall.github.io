@@ -1,18 +1,219 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portfolio</title>
+  <link rel="stylesheet" href="stylesheet.css" />
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Cormorant+Upright:wght@300;400;500&family=Pinyon+Script&display=swap" rel="stylesheet" />
+</head>
+<body>
 
-    <title>wildfellhall - official website</title>
+  <!-- Navigation -->
+  <nav class="navbar">
+    <a class="nav-logo" href="#">your name</a>
+    <ul class="nav-links">
+      <li><a href="#about">About</a></li>
+      <li><a href="#projects">Projects</a></li>
+      <li><a href="#blog">Writing</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <button class="nav-toggle" aria-label="Toggle navigation">&#9776;</button>
+  </nav>
 
-    <meta name="author" content="wildfellhall">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" type="text/css" href="stylesheet.css">
-  </head>
-  <body>
-    <div id = "banner">
-      <h1>
-        Welcome to wildfellhall's Website!
-      </h1>
+  <!-- Hero -->
+  <header class="hero">
+    <div class="hero-inner">
+      <p class="hero-eyebrow">welcome to my corner of the web</p>
+      <h1 class="hero-name">Your Name</h1>
+      <p class="hero-tagline">Designer &nbsp;·&nbsp; Writer &nbsp;·&nbsp; Creator</p>
+      <a href="#about" class="hero-scroll">scroll down ↓</a>
     </div>
-  </body>
+    <div class="hero-deco" aria-hidden="true">&#10022;</div>
+  </header>
+
+  <!-- About -->
+  <section id="about" class="section about">
+    <div class="section-label">About</div>
+    <div class="about-grid">
+      <div class="about-image-wrap">
+        <div class="about-image-placeholder">
+          <span>photo</span>
+        </div>
+      </div>
+      <div class="about-text">
+        <h2 class="section-title">A little about me</h2>
+        <p>
+          Hello and welcome! I'm a curious person with a love for crafting thoughtful things —
+          whether that's a piece of writing, a project, or an idea. This space is where I collect
+          and share the work that matters to me.
+        </p>
+        <p>
+          When I'm not working, you'll likely find me reading, wandering, or hunting for the
+          perfect cup of tea. Feel free to look around and reach out if anything resonates.
+        </p>
+        <a href="#contact" class="btn">Get in touch</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Projects -->
+  <section id="projects" class="section projects">
+    <div class="section-label">Projects</div>
+    <h2 class="section-title centered">Selected Work</h2>
+    <p class="section-subtitle">A collection of things I've made and ideas I've pursued.</p>
+
+    <div class="projects-grid">
+
+      <article class="project-card">
+        <div class="project-tag">Design</div>
+        <h3 class="project-title">Project One</h3>
+        <p class="project-desc">
+          A short description of what this project is, what you made, and what makes it interesting or meaningful to you.
+        </p>
+        <a href="#" class="project-link">View project →</a>
+      </article>
+
+      <article class="project-card featured">
+        <div class="project-tag">Research</div>
+        <h3 class="project-title">Project Two</h3>
+        <p class="project-desc">
+          A short description of what this project is, what you made, and what makes it interesting or meaningful to you.
+        </p>
+        <a href="#" class="project-link">View project →</a>
+      </article>
+
+      <article class="project-card">
+        <div class="project-tag">Writing</div>
+        <h3 class="project-title">Project Three</h3>
+        <p class="project-desc">
+          A short description of what this project is, what you made, and what makes it interesting or meaningful to you.
+        </p>
+        <a href="#" class="project-link">View project →</a>
+      </article>
+
+      <article class="project-card">
+        <div class="project-tag">Development</div>
+        <h3 class="project-title">Project Four</h3>
+        <p class="project-desc">
+          A short description of what this project is, what you made, and what makes it interesting or meaningful to you.
+        </p>
+        <a href="#" class="project-link">View project →</a>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- Blog -->
+  <section id="blog" class="section blog">
+    <div class="section-label">Writing</div>
+    <h2 class="section-title centered">From the Blog</h2>
+    <p class="section-subtitle">Thoughts, essays, and notes from along the way.</p>
+
+    <div class="blog-list">
+
+      <article class="blog-card">
+        <div class="blog-meta">
+          <span class="blog-date">May 2026</span>
+          <span class="blog-category">Reflection</span>
+        </div>
+        <h3 class="blog-title"><a href="#">The title of a blog post goes here</a></h3>
+        <p class="blog-excerpt">
+          A sentence or two summarizing what the post is about, giving readers a gentle reason to click through and read more.
+        </p>
+      </article>
+
+      <div class="blog-divider" aria-hidden="true"></div>
+
+      <article class="blog-card">
+        <div class="blog-meta">
+          <span class="blog-date">April 2026</span>
+          <span class="blog-category">Essay</span>
+        </div>
+        <h3 class="blog-title"><a href="#">Another post with an intriguing title</a></h3>
+        <p class="blog-excerpt">
+          A sentence or two summarizing what the post is about, giving readers a gentle reason to click through and read more.
+        </p>
+      </article>
+
+      <div class="blog-divider" aria-hidden="true"></div>
+
+      <article class="blog-card">
+        <div class="blog-meta">
+          <span class="blog-date">March 2026</span>
+          <span class="blog-category">Notes</span>
+        </div>
+        <h3 class="blog-title"><a href="#">A third piece worth reading</a></h3>
+        <p class="blog-excerpt">
+          A sentence or two summarizing what the post is about, giving readers a gentle reason to click through and read more.
+        </p>
+      </article>
+
+    </div>
+
+    <div class="blog-footer">
+      <a href="#" class="btn">Read all posts</a>
+    </div>
+  </section>
+
+  <!-- Contact -->
+  <section id="contact" class="section contact">
+    <div class="section-label">Contact</div>
+    <div class="contact-inner">
+      <h2 class="section-title centered">Let's talk</h2>
+      <p class="contact-sub">I'd love to hear from you — whether it's about work, collaboration, or just to say hello.</p>
+      <a href="mailto:hello@yourname.com" class="contact-email">hello@yourname.com</a>
+      <div class="contact-links">
+        <a href="#">Twitter</a>
+        <span aria-hidden="true">·</span>
+        <a href="#">LinkedIn</a>
+        <span aria-hidden="true">·</span>
+        <a href="#">GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p class="footer-script">made with care</p>
+    <p class="footer-copy">&copy; 2026 Your Name. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // Mobile nav toggle
+    const toggle = document.querySelector('.nav-toggle');
+    const navLinks = document.querySelector('.nav-links');
+    toggle.addEventListener('click', () => {
+      navLinks.classList.toggle('open');
+    });
+
+    // Smooth scroll + close mobile nav on link click
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function (e) {
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          navLinks.classList.remove('open');
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+
+    // Fade-in on scroll
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.project-card, .blog-card, .about-grid, .contact-inner').forEach(el => {
+      el.classList.add('fade-in');
+      observer.observe(el);
+    });
+  </script>
+
+</body>
+</html>
