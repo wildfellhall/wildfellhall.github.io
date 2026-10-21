@@ -1,0 +1,29 @@
+:root { font-family: Georgia, serif; color: #66563d; background: #e4c7cd; font-synthesis: none; color-scheme: light; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button { font: inherit; color: inherit; }
+[hidden] { display: none !important; }
+button:focus-visible { outline: 2px solid #947039; outline-offset: 5px; border-radius: 50%; }
+#room { position: relative; width: 100%; height: 100svh; min-height: 420px; overflow: hidden; isolation: isolate; background: #e4c7cd; }
+#desk { position: absolute; width: 100%; height: 100%; display: block; opacity: 0; transition: opacity 1.2s ease; outline: none; }
+.is-ready #desk { opacity: 1; }
+.room-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 47% 42%, transparent 40%, #302d2312 100%); z-index: 1; }
+.desk-controls { position: absolute; z-index: 3; right: max(20px, env(safe-area-inset-right)); bottom: max(18px, env(safe-area-inset-bottom)); display: flex; align-items: center; gap: 5px; padding: 3px; border-radius: 28px; background: #f9f0e8a6; border: 1px solid #fff7; box-shadow: 0 2px 12px #49332b0c; backdrop-filter: blur(9px); }
+.desk-controls button { border: 0; border-radius: 50%; background: transparent; padding: 12px; display: grid; place-items: center; cursor: pointer; transition: color .2s, background .2s; width: 44px; height: 44px; }
+.desk-controls button:hover { background: #98734e13; color: #8a632f; }
+.desk-controls button[aria-pressed='true'] { background: #98734e1a; color: #8a632f; }
+.desk-controls svg { width: 18px; height: 18px; }
+.control-divider { height: 14px; width: 1px; background: #6e68502b; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+#desk-fallback { position: absolute; inset: 0; background: url('/materials/rose-carpet-fallback.webp') center / cover; perspective: 1200px; transition: opacity .5s; }
+.is-ready #desk-fallback { opacity: 0; }
+.fallback-top { position: absolute; inset: 6% 4.5% 14%; background: linear-gradient(120deg, #fff3, #463b230c), url('/materials/ivory-fallback.webp') center / cover; transform: rotateX(15deg); border: 14px ridge #d9d4c4; border-radius: 20px; box-shadow: 0 25px 0 -8px #b8b1a0, 0 40px 70px #3a332955; }
+.fallback-embossing { position: absolute; top: 8%; left: 50%; width: min(28%, 420px); height: auto; transform: translateX(-50%); filter: drop-shadow(0 1px 0 #fff9d4) drop-shadow(0 -1px 0 #7b571c); }
+.fallback-apron { position: absolute; left: 6%; right: 6%; bottom: 11%; height: 3%; background: #d9d2bf; border: 2px ridge #e6decc; box-shadow: 0 8px 16px #39322433; }
+@media (max-width: 600px) {
+  .desk-controls { right: 15px; bottom: max(16px, env(safe-area-inset-bottom)); }
+  .fallback-top { inset: 5% -45% 15%; }
+  .fallback-embossing { width: 44%; }
+  .fallback-apron { left: -40%; right: -40%; bottom: 12%; }
+}
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

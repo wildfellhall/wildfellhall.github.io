@@ -1,0 +1,24 @@
+{
+  "name": "wildfell-writing-desk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "textures": "python3 scripts/make-materials.py && node scripts/make-ornaments.mjs",
+    "ornaments": "node scripts/make-ornaments.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "@fontsource/great-vibes": "^5.3.0",
+    "@playwright/test": "1.56.1",
+    "opentype.js": "^2.0.0",
+    "sharp": "^0.35.5",
+    "vite": "7.1.12"
+  }
+}
