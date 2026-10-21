@@ -1,18 +1,16 @@
 import * as THREE from 'three';
-import { createDesk, createEnvironment, createWindowShadow, createContactShadow } from './desk.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { createDesk, createEnvironment, createFloor } from './desk.js';
 import { createCarpet } from './ornaments.js';
 
-const room = document.querySelector('#room');
-const canvas = document.querySelector('#desk');
+const room = document.querySelector('#room'), canvas = document.querySelector('#desk');
 const status = document.querySelector('#render-status');
-const lightButton = document.querySelector('#light-toggle');
-const viewButton = document.querySelector('#view-toggle');
-const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
-const finePointer = window.matchMedia('(pointer: fine)');
-let evening = false;
-let close = false;
-let engine;
-
+const lightButton = document.querySelector('#light-toggle'), viewButton = document.querySelector('#view-toggle');
+const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)'), finePointer = window.matchMedia('(pointer: fine)');
+let evening = false, close = false, engine;
 lightButton.addEventListener('click', () => {
   evening = !evening;
   lightButton.setAttribute('aria-pressed', String(evening));
@@ -26,110 +24,118 @@ viewButton.addEventListener('click', () => {
   viewButton.setAttribute('aria-pressed', String(close));
   viewButton.setAttribute('aria-label', close ? 'Return to the whole desk' : 'Look closer at the desk');
   room.classList.toggle('is-close', close);
-  status.textContent = close ? 'A closer view of the painted wood grain.' : 'The whole writing desk.';
+  status.textContent = close ? 'A closer view of the drawers and relief carving.' : 'The whole writing desk.';
   engine?.invalidate();
 });
 
 async function init() {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'low-power' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.6));
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.VSMShadowMap;
   renderer.shadowMap.autoUpdate = false;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.22;
+  renderer.toneMappingExposure = 1.05;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#e4c7cd');
-  const camera = new THREE.OrthographicCamera(-8, 8, 5, -5, .1, 70);
-  camera.position.set(0, 16, 9.2);
-  const target = new THREE.Vector3(0, -.15, .1);
-  camera.lookAt(target);
+  scene.background = new THREE.Color('#b9afa0');
+  scene.fog = new THREE.FogExp2('#b9afa0', .009);
+  const camera = new THREE.PerspectiveCamera(34, 1, .1, 160);
+  const baseTarget = new THREE.Vector3(0, -2.45, 0);
+  const direction = new THREE.Vector3(8.3, 9.6, 20).normalize();
+  let distance = 30;
   createEnvironment(renderer, scene);
-  const hemisphere = new THREE.HemisphereLight('#fff8ea', '#7c7964', 2.1);
+  const hemisphere = new THREE.HemisphereLight('#e9edf1', '#8d7561', .72);
   scene.add(hemisphere);
-  const sunlight = new THREE.DirectionalLight('#fff4db', 3.0);
-  sunlight.position.set(-7, 11, -5);
+  const sunlight = new THREE.DirectionalLight('#fff0d6', 3.0);
+  sunlight.position.set(-8, 12, 10);
+  sunlight.target.position.set(0, -2, 0);
   sunlight.castShadow = true;
-  sunlight.shadow.mapSize.set(2048, 2048);
-  Object.assign(sunlight.shadow.camera, { left: -12, right: 12, top: 11, bottom: -11, near: .5, far: 35 });
-  sunlight.shadow.bias = -.0003;
-  sunlight.shadow.normalBias = .025;
-  sunlight.shadow.radius = 4;
-  scene.add(sunlight);
-  const fill = new THREE.DirectionalLight('#dce3eb', .65);
-  fill.position.set(5, 6, 6);
-  scene.add(fill);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: '#dcb9c3', roughness: 1 }));
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.y = -3.52;
-  floor.receiveShadow = true;
-  scene.add(floor, createContactShadow());
+  sunlight.shadow.mapSize.set(1024, 1024);
+  Object.assign(sunlight.shadow.camera, { left: -13, right: 13, top: 13, bottom: -13, near: .5, far: 40 });
+  sunlight.shadow.bias = -.00008;
+  sunlight.shadow.normalBias = .018;
+  sunlight.shadow.radius = 7;
+  sunlight.shadow.blurSamples = 12;
+  scene.add(sunlight, sunlight.target);
+  // Sample a broad window opening: each light contributes a fraction of the
+  // illumination, with independently filtered shadows for a soft penumbra.
+  const windowLights = [sunlight];
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2;
+    const light = sunlight.clone();
+    light.target = sunlight.target;
+    light.position.set(-8 + Math.cos(a) * 2.1, 12 + Math.sin(a) * 2.5, 10 + Math.cos(a) * 1.6);
+    windowLights.push(light); scene.add(light);
+  }
+  const fill = new THREE.DirectionalLight('#dfe7ee', .55);
+  fill.position.set(9, 3, 7); scene.add(fill);
+  const rim = new THREE.DirectionalLight('#fff3e3', .75);
+  rim.position.set(-2, 6, -8); scene.add(rim);
   const [desk, carpet] = await Promise.all([createDesk(renderer), createCarpet(renderer)]);
-  scene.add(desk.group, carpet);
-  const windowShadow = createWindowShadow();
-  desk.group.add(windowShadow);
+  scene.add(createFloor(), carpet, desk.group);
   renderer.shadowMap.needsUpdate = true;
+
+  // Small-scale occlusion makes the carved undercuts read without painting black outlines.
+  const composer = new EffectComposer(renderer);
+  composer.renderTarget1.samples = 4; composer.renderTarget2.samples = 4;
+  composer.addPass(new RenderPass(scene, camera));
+  const ao = new GTAOPass(scene, camera, 512, 512);
+  ao.updateGtaoMaterial({ radius: .48, thickness: 1, distanceExponent: 1.6, scale: 1.20, samples: 16 });
+  ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, samples: 16 });
+  ao.blendIntensity = .80;
+  composer.addPass(ao); composer.addPass(new OutputPass());
 
   let width = 0, height = 0, frame = 0, lastTime = 0;
   let currentLight = 0, currentZoom = 1;
-  const pointer = new THREE.Vector2();
-  const currentPointer = new THREE.Vector2();
-  const afternoon = new THREE.Color('#fff4db');
-  const dusk = new THREE.Color('#ffd29a');
-  const sky = new THREE.Color('#fff8ea');
-  const duskSky = new THREE.Color('#d6c5ad');
-  const coolFill = new THREE.Color('#dce3eb');
-  const duskFill = new THREE.Color('#afbaca');
-
+  const pointer = new THREE.Vector2(), currentPointer = new THREE.Vector2();
+  const afternoon = new THREE.Color('#fff0d6'), dusk = new THREE.Color('#ffcb94');
+  const sky = new THREE.Color('#e9edf1'), duskSky = new THREE.Color('#b9c0d0');
   function resize() {
     width = room.clientWidth; height = room.clientHeight;
-    renderer.setSize(width, height, false);
-    const aspect = width / height;
-    // A portrait viewport is a close view across the same desk, not a tiny table.
-    const viewHeight = aspect < 1 ? 10.6 : Math.max(10.15, 17.8 / aspect);
-    camera.left = -viewHeight * aspect / 2;
-    camera.right = viewHeight * aspect / 2;
-    camera.top = viewHeight / 2;
-    camera.bottom = -viewHeight / 2;
+    renderer.setSize(width, height, false); composer.setSize(width, height);
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    // Fit the entire piece of furniture in portrait as well as landscape.
+    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize();
+    const up = new THREE.Vector3().crossVectors(direction, right).normalize();
+    const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), tanX = tanY * camera.aspect;
+    distance = 0;
+    for (const x of [-7.85, 7.85]) for (const y of [-6.1, .35]) for (const z of [-3.95, 4.0]) {
+      const p = new THREE.Vector3(x, y, z).sub(baseTarget), depth = p.dot(direction);
+      distance = Math.max(distance, Math.abs(p.dot(right)) / tanX + depth, Math.abs(p.dot(up)) / tanY + depth);
+    }
+    distance *= 1.10;
     invalidate();
   }
-
-  function invalidate() {
-    if (!frame && !document.hidden) frame = requestAnimationFrame(render);
-  }
-
+  function invalidate() { if (!frame && !document.hidden) frame = requestAnimationFrame(render); }
   function render(now) {
     frame = 0;
-    const delta = Math.min((now - (lastTime || now - 16)) / 1000, .05);
-    lastTime = now;
-    const factor = motionQuery.matches ? 1 : 1 - Math.exp(-delta * 5);
-    const desiredLight = evening ? 1 : 0;
-    const desiredZoom = close ? 1.40 : 1;
+    const delta = Math.min((now - (lastTime || now - 16)) / 1000, .05); lastTime = now;
+    const factor = motionQuery.matches ? 1 : 1 - Math.exp(-delta * 6);
+    const desiredLight = evening ? 1 : 0, desiredZoom = close ? 1.30 : 1;
     currentLight = THREE.MathUtils.lerp(currentLight, desiredLight, factor);
     currentZoom = THREE.MathUtils.lerp(currentZoom, desiredZoom, factor);
     currentPointer.lerp(pointer, factor);
-    sunlight.color.copy(afternoon).lerp(dusk, currentLight);
-    sunlight.intensity = 3 - currentLight * 1.25;
+    for (const light of windowLights) {
+      light.color.copy(afternoon).lerp(dusk, currentLight);
+      light.intensity = (2.65 - currentLight * .95) / windowLights.length;
+    }
     hemisphere.color.copy(sky).lerp(duskSky, currentLight);
-    hemisphere.intensity = 2.1 - currentLight * .65;
-    fill.color.copy(coolFill).lerp(duskFill, currentLight);
-    renderer.toneMappingExposure = 1.22 - currentLight * .14;
-    windowShadow.material.opacity = .9 - currentLight * .45;
-    camera.zoom = currentZoom;
-    camera.position.set(currentPointer.x * .22, 16 + currentPointer.y * .12, 9.2);
-    camera.lookAt(target);
-    camera.updateProjectionMatrix();
-    renderer.render(scene, camera);
+    hemisphere.intensity = .72 - currentLight * .18;
+    renderer.toneMappingExposure = .98 - currentLight * .08;
+    const target = baseTarget.clone();
+    target.y += (currentZoom - 1) * 2.6; target.z += (currentZoom - 1) * 1.7;
+    camera.position.copy(target).addScaledVector(direction, distance);
+    camera.position.x += currentPointer.x * .26; camera.position.y += currentPointer.y * .14;
+    camera.lookAt(target); camera.zoom = currentZoom; camera.updateProjectionMatrix();
+    composer.render();
     const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentZoom - desiredZoom) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
     if (unsettled) invalidate();
   }
-
   room.addEventListener('pointermove', event => {
     if (motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
-    pointer.set((event.clientX / width - .5) * 2, (event.clientY / height - .5) * 2);
-    invalidate();
+    pointer.set((event.clientX / width - .5) * 2, (event.clientY / height - .5) * 2); invalidate();
   }, { passive: true });
   room.addEventListener('pointerleave', () => { pointer.set(0, 0); invalidate(); });
   motionQuery.addEventListener('change', () => { pointer.set(0, 0); invalidate(); });
@@ -138,29 +144,24 @@ async function init() {
     else { lastTime = 0; invalidate(); }
   });
   canvas.addEventListener('webglcontextlost', event => {
-    event.preventDefault();
-    cancelAnimationFrame(frame); frame = 0;
-    room.classList.remove('is-ready');
+    event.preventDefault(); cancelAnimationFrame(frame); frame = 0;
+    room.classList.remove('is-ready'); document.querySelector('.desk-controls').hidden = true;
     status.textContent = 'Showing the still desk while the graphics connection recovers.';
   });
   canvas.addEventListener('webglcontextrestored', () => {
-    renderer.shadowMap.needsUpdate = true;
-    room.classList.add('is-ready');
-    invalidate();
+    renderer.shadowMap.needsUpdate = true; room.classList.add('is-ready');
+    document.querySelector('.desk-controls').hidden = false; invalidate();
   });
-  new ResizeObserver(resize).observe(room);
-  resize();
-  room.classList.add('is-ready');
-  document.querySelector('.desk-controls').hidden = false;
+  new ResizeObserver(resize).observe(room); resize();
+  render(performance.now());
+  room.classList.add('is-ready'); document.querySelector('.desk-controls').hidden = false;
   status.textContent = 'The writing room is ready.';
   return { invalidate };
 }
-
 init().then(result => { engine = result; }).catch(error => {
   console.error('The 3D desk could not be loaded:', error);
   room.classList.add('is-fallback');
   status.textContent = 'Showing a still version of the writing desk.';
-  lightButton.disabled = true;
-  viewButton.disabled = true;
+  lightButton.disabled = viewButton.disabled = true;
   document.querySelector('.desk-controls').hidden = true;
 });

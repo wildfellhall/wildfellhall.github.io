@@ -11,9 +11,14 @@
   </head>
   <body>
     <main id="room" aria-label="An antique white wooden writing desk">
-      <div id="desk-fallback" aria-hidden="true"><div class="fallback-top"><img class="fallback-embossing" src="./ornaments/wildfell-hall.svg" alt="" /></div><div class="fallback-apron"></div></div>
+      <div id="desk-fallback" aria-hidden="true">
+        <picture>
+          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp" />
+          <img src="./materials/desk-still.webp" alt="" fetchpriority="high" />
+        </picture>
+      </div>
       <h1 class="sr-only">Wildfell Hall</h1>
-      <canvas id="desk" aria-label="An ivory wooden desk with elaborate floral carvings, Wildfell Hall embossed in gold script, and an ornate light pink carpet beneath"></canvas>
+      <canvas id="desk" aria-label="An antique ivory writing desk with carved drawers, porcelain and brass knobs, cabriole legs, gold script, and a light pink floral carpet"></canvas>
       <div class="room-vignette" aria-hidden="true"></div>
         <div class="desk-controls" role="group" aria-label="Room atmosphere" hidden>
           <button id="light-toggle" aria-label="Change to evening light" aria-pressed="false">

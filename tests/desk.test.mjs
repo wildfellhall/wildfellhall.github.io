@@ -59,6 +59,28 @@ test('a texture loading failure keeps the fallback visible and removes inactive 
   await page.goto(baseURL);
   await page.locator('#room.is-fallback').waitFor();
   assert.equal(await page.locator('#desk-fallback').isVisible(), true);
+  assert.equal(await page.locator('#desk-fallback img').evaluate(async image => { await image.decode(); return image.naturalWidth > 0; }), true);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
+  await page.close();
+});
+
+test('browsers without WebGL show the matching still desk', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (type, ...args) {
+      return /webgl/i.test(type) ? null : getContext.call(this, type, ...args);
+    };
+  });
+  await page.goto(baseURL);
+  await page.locator('#room.is-fallback').waitFor();
+  const still = await page.locator('#desk-fallback img').evaluate(async image => {
+    await image.decode();
+    return { width: image.naturalWidth, source: image.currentSrc };
+  });
+  assert.ok(still.width > 0);
+  assert.match(still.source, /desk-still-portrait\.webp$/);
+  assert.equal(await page.locator('.desk-controls').isVisible(), false);
+  await page.screenshot({ path: 'test-results/fallback.png' });
   await page.close();
 });

@@ -9,6 +9,7 @@
     "preview": "vite preview --host 127.0.0.1",
     "textures": "python3 scripts/make-materials.py && node scripts/make-ornaments.mjs",
     "ornaments": "node scripts/make-ornaments.mjs",
+    "fallback": "node scripts/capture-fallback.mjs",
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
