@@ -17,7 +17,9 @@ try {
   });
   // Capture portrait at the picture source's widest aspect ratio. object-fit:
   // cover then crops its sides like the orthographic camera on narrower phones.
-  for (const [name, width, height, deviceScaleFactor] of [['desk-still', 1440, 1000, 1], ['desk-still-portrait', 630, 840, 2]]) {
+  // The wide camera preserves vertical room for the feet, so it needs its own
+  // still rather than cropping the feet off the standard landscape image.
+  for (const [name, width, height, deviceScaleFactor] of [['desk-still', 1440, 1000, 1], ['desk-still-portrait', 630, 840, 2], ['desk-still-wide', 2560, 1080, 1]]) {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor, reducedMotion: 'reduce' });
     await page.goto(url);
     await page.locator('#room.is-ready').waitFor({ timeout: 60000 });

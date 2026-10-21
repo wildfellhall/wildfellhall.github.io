@@ -57,15 +57,20 @@ export function createCarvings(paint, edgePaint, patina) {
     return curve;
   }
   function leaf(x, y, angle, length = .55, width = .22, relief = .075) {
-    const vertices = [], uv = [], indices = [], rows = 26, columns = 10;
+    const vertices = [], uv = [], indices = [], rows = 36, columns = 18;
     for (let i = 0; i <= rows; i++) {
       const t = i / rows;
       const envelope = Math.pow(Math.sin(Math.PI * t), .85);
       const lobes = .87 + .13 * Math.cos(t * Math.PI * 7);
       for (let j = 0; j <= columns; j++) {
         const s = j / columns * 2 - 1;
+        // Incised branching veins are cut into the leaf surface itself so
+        // side lighting catches their rounded shoulders and recessed channels.
+        let channels = 0;
+        for (const fork of [.20, .39, .58, .74]) channels += Math.exp(-Math.pow((t - fork - Math.abs(s) * .15) / .024, 2));
+        const veinDepth = .014 * channels * Math.sin(Math.PI * Math.abs(s)) * envelope;
         vertices.push(t * length, s * width * envelope * lobes,
-          .018 + relief * envelope * Math.pow(Math.max(0, 1 - s * s), 1.2) + .024 * Math.sin(t * Math.PI * 2));
+          .018 + relief * envelope * Math.pow(Math.max(0, 1 - s * s), 1.2) + .024 * Math.sin(t * Math.PI * 2) - veinDepth);
         uv.push(t, j / columns);
         if (i < rows && j < columns) {
           const a = i * (columns + 1) + j, b = a + columns + 1;
@@ -158,10 +163,10 @@ export function createCarvings(paint, edgePaint, patina) {
   }
   // Restrained corner details and a fine pearl edge leave a clear writing surface.
   for (const [x, z, rotation] of [[-7.12, -3.23, 0], [7.12, -3.23, -Math.PI / 2], [7.12, 3.15, Math.PI], [-7.12, 3.15, Math.PI / 2]]) {
-    frame = new THREE.Matrix4().makeTranslation(x, .203, z).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2)).multiply(new THREE.Matrix4().makeRotationZ(rotation)).multiply(new THREE.Matrix4().makeScale(.9, .9, .4));
-    foliate([[0, -.95], [.02, -.15], [.30, -.02], [1, 0]], 5, .22);
+    frame = new THREE.Matrix4().makeTranslation(x, .203, z).multiply(new THREE.Matrix4().makeRotationX(-Math.PI / 2)).multiply(new THREE.Matrix4().makeRotationZ(rotation)).multiply(new THREE.Matrix4().makeScale(1.3, 1.3, .85));
+    foliate([[0, -.95], [.02, -.15], [.30, -.02], [1, 0]], 7, .28);
     stroke([[.15, -.60], [.85, -.72], [.72, -.13], [.48, -.27]], .023);
-    rose(.16, -.15, .10);
+    rose(.16, -.15, .15);
   }
   for (let i = 0; i < 150; i++) {
     const x = -7.20 + i * 14.40 / 149;

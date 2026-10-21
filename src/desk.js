@@ -24,14 +24,14 @@ export async function createDesk(renderer) {
   const writingSurface = new THREE.Group(); writingSurface.position.y = DESK.surfaceY;
   writingSurface.name = 'writing-surface-objects'; group.add(writingSurface);
   const loader = new THREE.TextureLoader();
-  const [colorMap, bumpMap, roughnessMap] = await Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp`)));
+  const [colorMap, bumpMap, roughnessMap] = await Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=grain-2`)));
   colorMap.colorSpace = THREE.SRGBColorSpace;
   for (const t of [colorMap, bumpMap, roughnessMap]) t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  const paint = new THREE.MeshStandardMaterial({ color: '#e6e0d2', roughness: .64, bumpMap, bumpScale: .009 });
+  const paint = new THREE.MeshStandardMaterial({ color: '#e6e0d2', roughness: .68, bumpMap, bumpScale: .018 });
   const edge = new THREE.MeshStandardMaterial({ color: '#d6cdbb', roughness: .60 });
   const recess = new THREE.MeshStandardMaterial({ color: '#a79b86', roughness: .88 });
-  const panel = new THREE.MeshStandardMaterial({ color: '#dbd4c5', roughness: .72, bumpMap, bumpScale: .012 });
-  const wood = new THREE.MeshStandardMaterial({ map: colorMap, bumpMap, bumpScale: .016, roughnessMap, roughness: .76, color: '#f8f5ed' });
+  const panel = new THREE.MeshStandardMaterial({ color: '#dbd4c5', roughness: .72, bumpMap, bumpScale: .025 });
+  const wood = new THREE.MeshStandardMaterial({ map: colorMap, bumpMap, bumpScale: .045, roughnessMap, roughness: .84, color: '#f8f5ed' });
   const brass = new THREE.MeshStandardMaterial({ color: '#9c7844', metalness: .84, roughness: .39 });
   const bronze = new THREE.MeshStandardMaterial({ color: '#655239', metalness: .73, roughness: .58 });
   const porcelain = new THREE.MeshPhysicalMaterial({ color: '#e9e2d4', roughness: .24, clearcoat: .55, clearcoatRoughness: .27 });
@@ -123,9 +123,9 @@ export async function createDesk(renderer) {
       petal.scale.set(.035, .048, .02); petal.rotation.z = -a;
     }
     const neck = mesh(new THREE.CylinderGeometry(.067, .085, .16, 24), brass, x, y, z + .12); neck.rotation.x = Math.PI / 2;
-    const bulb = mesh(new THREE.SphereGeometry(1, 32, 24), porcelain, x, y, z + .24); bulb.scale.set(.155, .16, .115);
-    mesh(new THREE.TorusGeometry(.15, .012, 8, 32), brass, x, y, z + .245);
-    const face = mesh(new THREE.SphereGeometry(.024, 12, 8), brass, x, y, z + .354); face.scale.z = .5;
+    const bulb = mesh(new THREE.SphereGeometry(1, 32, 24), porcelain, x, y, z + .24); bulb.scale.set(.185, .18, .135);
+    mesh(new THREE.TorusGeometry(.175, .012, 8, 32), brass, x, y, z + .245);
+    const face = mesh(new THREE.SphereGeometry(.024, 12, 8), brass, x, y, z + .374); face.scale.z = .5;
   }
   for (const x of [-4.82, -1.34, 1.34, 4.82]) knob(x, -.93);
   const keyplate = mesh(new THREE.SphereGeometry(1, 24, 16), brass, 0, -1.30, 3.50); keyplate.scale.set(.09, .13, .018);
@@ -160,7 +160,7 @@ function taperedLeg(curve, radii) {
 export function createEnvironment(renderer, scene) {
   const generator = new THREE.PMREMGenerator(renderer), room = new RoomEnvironment();
   const result = generator.fromScene(room, .08);
-  scene.environment = result.texture; scene.environmentIntensity = .30;
+  scene.environment = result.texture; scene.environmentIntensity = .20;
   room.dispose(); generator.dispose(); return result;
 }
 

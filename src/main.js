@@ -24,7 +24,7 @@ viewButton.addEventListener('click', () => {
   viewButton.setAttribute('aria-pressed', String(close));
   viewButton.setAttribute('aria-label', close ? 'Return to the whole desk' : 'Look closer at the desk');
   room.classList.toggle('is-close', close);
-  status.textContent = close ? 'A closer overhead view of the writing surface.' : 'An overhead view of the writing desk.';
+  status.textContent = close ? 'A closer view of the carved drawers, porcelain knobs, and cabriole legs.' : 'An elevated view of the antique writing desk.';
   engine?.invalidate();
 });
 
@@ -41,15 +41,17 @@ async function init() {
   scene.background = new THREE.Color('#b9afa0');
   scene.fog = new THREE.FogExp2('#b9afa0', .009);
   const camera = new THREE.OrthographicCamera(-8.2, 8.2, 5.7, -5.7, .1, 80);
-  // The writing surface is the composition. Looking along -Y with -Z up
-  // keeps every desktop edge square to the screen, including during motion.
-  camera.up.set(0, 0, -1);
-  const baseTarget = new THREE.Vector3(0, .203, 0);
+  // Keep the tabletop prominent while revealing the frieze and carved knees.
+  // The detail view lowers the eye to the drawer fronts instead of zooming
+  // further into an empty patch of the writing surface.
+  const baseTarget = new THREE.Vector3(0, -2.3, 0);
+  const overviewDirection = new THREE.Vector3(2, 22, 17).normalize();
+  const detailDirection = new THREE.Vector3(3, 15, 23).normalize();
   createEnvironment(renderer, scene);
-  const hemisphere = new THREE.HemisphereLight('#e9edf1', '#8d7561', .72);
+  const hemisphere = new THREE.HemisphereLight('#e9edf1', '#8d7561', .42);
   scene.add(hemisphere);
   const sunlight = new THREE.DirectionalLight('#fff0d6', 3.0);
-  sunlight.position.set(-8, 12, 10);
+  sunlight.position.set(-11, 9, 8);
   sunlight.target.position.set(0, -2, 0);
   sunlight.castShadow = true;
   sunlight.shadow.mapSize.set(1024, 1024);
@@ -66,14 +68,16 @@ async function init() {
     const a = i / 6 * Math.PI * 2;
     const light = sunlight.clone();
     light.target = sunlight.target;
-    light.position.set(-8 + Math.cos(a) * 2.1, 12 + Math.sin(a) * 2.5, 10 + Math.cos(a) * 1.6);
+    light.position.set(-11 + Math.cos(a) * 1.6, 9 + Math.sin(a) * 1.8, 8 + Math.cos(a) * 1.2);
     windowLights.push(light); scene.add(light);
   }
-  const fill = new THREE.DirectionalLight('#dfe7ee', .55);
+  const fill = new THREE.DirectionalLight('#dfe7ee', .32);
   fill.position.set(9, 3, 7); scene.add(fill);
-  const rim = new THREE.DirectionalLight('#fff3e3', .75);
+  const rim = new THREE.DirectionalLight('#fff3e3', .45);
   rim.position.set(-2, 6, -8); scene.add(rim);
   const [desk, carpet] = await Promise.all([createDesk(renderer), createCarpet(renderer)]);
+  // A room-size carpet keeps the elevated composition on the blush textile.
+  carpet.scale.set(1.85, 1, 1.85); carpet.position.z = -3;
   scene.add(createFloor(), carpet, desk.group);
   renderer.shadowMap.needsUpdate = true;
 
@@ -88,7 +92,8 @@ async function init() {
   composer.addPass(ao); composer.addPass(new OutputPass());
 
   let width = 0, height = 0, frame = 0, lastTime = 0;
-  let currentLight = 0, currentZoom = 1;
+  let currentLight = 0, currentDetail = 0;
+  let pan = 0, drag = null;
   const pointer = new THREE.Vector2(), currentPointer = new THREE.Vector2();
   const afternoon = new THREE.Color('#fff0d6'), dusk = new THREE.Color('#ffcb94');
   const sky = new THREE.Color('#e9edf1'), duskSky = new THREE.Color('#b9c0d0');
@@ -97,10 +102,20 @@ async function init() {
     renderer.setSize(width, height, false); composer.setSize(width, height);
     // A narrow carpet surround on desktop; portrait crops the sides instead
     // of shrinking the writing surface into the middle of a large floor.
-    const aspect = width / height, viewHeight = Math.min(11.4, 16.4 / aspect);
+    const aspect = width / height, viewHeight = Math.min(12.2, Math.max(11.6, 17.6 / aspect));
     camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
     camera.top = viewHeight / 2; camera.bottom = -camera.top;
     camera.updateProjectionMatrix();
+    invalidate();
+  }
+  function panLimit() {
+    const cropped = 8.1 - (camera.right - camera.left) / (2 * camera.zoom);
+    // A little travel past the edge brings the outer knob and carved knee
+    // into the centre of a phone, clear of the floating atmosphere controls.
+    return cropped > 0 ? Math.min(6.6, cropped + 1.2) : 0;
+  }
+  function setPan(value) {
+    pan = THREE.MathUtils.clamp(value, -panLimit(), panLimit());
     invalidate();
   }
   function invalidate() { if (!frame && !document.hidden) frame = requestAnimationFrame(render); }
@@ -108,31 +123,66 @@ async function init() {
     frame = 0;
     const delta = Math.min((now - (lastTime || now - 16)) / 1000, .05); lastTime = now;
     const factor = motionQuery.matches ? 1 : 1 - Math.exp(-delta * 6);
-    const desiredLight = evening ? 1 : 0, desiredZoom = close ? 1.30 : 1;
+    const desiredLight = evening ? 1 : 0, desiredDetail = close ? 1 : 0;
     currentLight = THREE.MathUtils.lerp(currentLight, desiredLight, factor);
-    currentZoom = THREE.MathUtils.lerp(currentZoom, desiredZoom, factor);
+    currentDetail = THREE.MathUtils.lerp(currentDetail, desiredDetail, factor);
     currentPointer.lerp(pointer, factor);
     for (const light of windowLights) {
       light.color.copy(afternoon).lerp(dusk, currentLight);
-      light.intensity = (2.65 - currentLight * .95) / windowLights.length;
+      light.intensity = (3.05 - currentLight * .95) / windowLights.length;
     }
     hemisphere.color.copy(sky).lerp(duskSky, currentLight);
-    hemisphere.intensity = .72 - currentLight * .18;
-    renderer.toneMappingExposure = .98 - currentLight * .08;
+    hemisphere.intensity = .42 - currentLight * .10;
+    renderer.toneMappingExposure = .94 - currentLight * .06;
     const target = baseTarget.clone();
     target.x += currentPointer.x * .07;
-    target.z += currentPointer.y * .05 - (currentZoom - 1) * 1.2;
-    camera.position.copy(target).add(new THREE.Vector3(0, 24, 0));
-    camera.lookAt(target); camera.zoom = currentZoom; camera.updateProjectionMatrix();
+    target.y -= currentDetail * .15;
+    target.z += currentPointer.y * .05 + currentDetail * 1.2;
+    const direction = overviewDirection.clone().lerp(detailDirection, currentDetail).normalize();
+    camera.zoom = 1 + currentDetail * .14;
+    pan = THREE.MathUtils.clamp(pan, -panLimit(), panLimit());
+    const right = new THREE.Vector3(direction.z, 0, -direction.x).normalize();
+    target.addScaledVector(right, pan);
+    camera.position.copy(target).addScaledVector(direction, 28);
+    camera.lookAt(target); camera.updateProjectionMatrix();
+    const pannable = panLimit() > .1;
+    room.classList.toggle('is-pannable', pannable);
+    canvas.tabIndex = pannable ? 0 : -1;
+    if (pannable) canvas.setAttribute('aria-describedby', 'desk-help');
+    else canvas.removeAttribute('aria-describedby');
     composer.render();
-    const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentZoom - desiredZoom) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
+    const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentDetail - desiredDetail) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
     if (unsettled) invalidate();
   }
   room.addEventListener('pointermove', event => {
-    if (motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
+    if (drag || motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
     pointer.set((event.clientX / width - .5) * 2, (event.clientY / height - .5) * 2); invalidate();
   }, { passive: true });
   room.addEventListener('pointerleave', () => { pointer.set(0, 0); invalidate(); });
+  canvas.addEventListener('pointerdown', event => {
+    if (!event.isPrimary || event.button !== 0 || panLimit() <= .1) return;
+    drag = { id: event.pointerId, x: event.clientX, pan };
+    pointer.set(0, 0);
+    canvas.setPointerCapture(event.pointerId);
+    room.classList.add('is-dragging');
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!drag || event.pointerId !== drag.id) return;
+    const visibleWidth = (camera.right - camera.left) / camera.zoom;
+    setPan(drag.pan - (event.clientX - drag.x) / width * visibleWidth);
+  });
+  const endDrag = () => { drag = null; room.classList.remove('is-dragging'); };
+  canvas.addEventListener('lostpointercapture', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('pointerup', event => {
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    endDrag();
+  });
+  canvas.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
+    event.preventDefault();
+    setPan(event.key === 'Home' ? 0 : pan + (event.key === 'ArrowRight' ? .9 : -.9));
+  });
   motionQuery.addEventListener('change', () => { pointer.set(0, 0); invalidate(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { cancelAnimationFrame(frame); frame = 0; }
@@ -140,6 +190,7 @@ async function init() {
   });
   canvas.addEventListener('webglcontextlost', event => {
     event.preventDefault(); cancelAnimationFrame(frame); frame = 0;
+    endDrag(); canvas.tabIndex = -1;
     room.classList.remove('is-ready'); document.querySelector('.desk-controls').hidden = true;
     status.textContent = 'Showing the still desk while the graphics connection recovers.';
   });

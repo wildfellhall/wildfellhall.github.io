@@ -38,11 +38,11 @@ for i, (low, high) in enumerate(zip(bounds[:-1], bounds[1:])):
     center_y = [.46, .7, .32, .4, .72][i]
     warp = .012 * np.sin(x * 15 + i * 4) + .013 * (long - .5)
     ellipse = np.sqrt(((x - center_x) * .29) ** 2 + ((yy - center_y) * .18) ** 2 + .00018)
-    phase = (yy + warp + ellipse * .65 + (cloud - .5) * .025) * (64 + i * 9)
+    phase = (yy + warp + ellipse * .65 + (cloud - .5) * .025) * (32 + i * 5)
     annual = np.maximum(0, np.sin(phase * 6.283 + long * 3)) ** 8
     fibers = np.maximum(0, np.sin((yy + warp * .08) * 1900 + fine * 5)) ** 18
     grain += mask * (annual * .55 + fibers * .25 + long * .15)
-    board_tint += mask * [1, -1.2, .4, -1.8, .3][i]
+    board_tint += mask * [1.8, -2.4, .7, -3, .5][i]
     if i:
         seam_center = low + .00015 * np.sin(x * 35 + i) + .00011 * (cloud - .5)
         seams += np.exp(-((y - seam_center) / .00032) ** 2) * .7
@@ -54,12 +54,12 @@ edge_field = field(230, 170) * .7 + field(650, 430) * .3
 wear = np.clip((3 + edge_field * 11 - distance) / 7, 0, 1)
 chips = wear * np.clip((edge_field - .58) * 6, 0, 1)
 tone = (cloud - .5) * 9 + (paint - .5) * 2.8 + (brush - .5) * 2.4
-tone += board_tint - grain * 27 - seams * 24 + micro * .7
+tone += board_tint - grain * 49 - seams * 34 + micro * .7
 base = np.stack([235 + tone, 232 + tone, 222 + tone], axis=-1)
 wood = np.stack([163 + long * 16, 140 + long * 16, 108 + long * 13], axis=-1)
 base = base * (1 - chips[..., None] * .78) + wood * chips[..., None] * .78
 albedo = Image.fromarray(np.uint8(np.clip(base, 0, 255)))
-height = Image.fromarray(np.uint8(np.clip(164 - grain * 64 - seams * 100 + (brush - .5) * 19 + micro * 2 - chips * 38, 0, 255)))
+height = Image.fromarray(np.uint8(np.clip(164 - grain * 82 - seams * 100 + (brush - .5) * 19 + micro * 2 - chips * 38, 0, 255)))
 rough = Image.fromarray(np.uint8(np.clip(193 + (cloud - .5) * 24 + grain * 25 - wear * 20 + micro * 2, 0, 255)))
 
 # Quiet, nonuniform traces of use. Never a repeating grunge overlay.

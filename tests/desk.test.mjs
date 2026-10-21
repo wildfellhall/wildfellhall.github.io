@@ -41,12 +41,25 @@ test('desk renders, atmosphere and close view work, and keyboard controls remain
   await page.close();
 });
 
-test('portrait layout fills the viewport and both controls work by touch', async () => {
+test('portrait layout supports touch inspection, keyboard recentering, and both controls', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   await page.goto(baseURL);
   await page.locator('#room.is-ready').waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.screenshot({ path: 'test-results/mobile.png' });
+  const centered = await page.locator('#desk').screenshot();
+  const touch = await page.context().newCDPSession(page);
+  for (let i = 0; i < 2; i++) {
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 320, y: 430 }] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 50, y: 430 }] });
+    await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  assert.notDeepEqual(await page.locator('#desk').screenshot(), centered, 'Dragging must reveal a different part of the furniture');
+  await page.screenshot({ path: 'test-results/mobile-carving.png' });
+  await page.locator('#desk').focus();
+  await page.keyboard.press('Home');
+  await page.locator('#desk').evaluate(canvas => canvas.blur());
+  assert.deepEqual(await page.locator('#desk').screenshot(), centered, 'Home must restore the original composition');
   await page.getByRole('button', { name: 'Change to evening light' }).tap();
   await page.getByRole('button', { name: 'Look closer at the desk' }).tap();
   assert.equal(await page.getByRole('button', { name: 'Return to the whole desk' }).getAttribute('aria-pressed'), 'true');
@@ -55,7 +68,7 @@ test('portrait layout fills the viewport and both controls work by touch', async
 
 test('a texture loading failure keeps the fallback visible and removes inactive controls', async () => {
   const page = await browser.newPage();
-  await page.route('**/materials/ivory-color.webp', route => route.abort());
+  await page.route('**/materials/ivory-color.webp?v=*', route => route.abort());
   await page.goto(baseURL);
   await page.locator('#room.is-fallback').waitFor();
   assert.equal(await page.locator('#desk-fallback').isVisible(), true);
@@ -79,8 +92,14 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=overhead-1$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=detail-2$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   await page.screenshot({ path: 'test-results/fallback.png' });
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
+  assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
+    await image.decode(); return image.currentSrc;
+  }), /desk-still-wide\.webp\?v=detail-2$/);
+  await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });

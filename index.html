@@ -13,12 +13,14 @@
     <main id="room" aria-label="An antique white wooden writing desk">
       <div id="desk-fallback" aria-hidden="true">
         <picture>
-          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=overhead-1" />
-          <img src="./materials/desk-still.webp?v=overhead-1" alt="" fetchpriority="high" />
+          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=detail-2" />
+          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=detail-2" />
+          <img src="./materials/desk-still.webp?v=detail-2" alt="" fetchpriority="high" />
         </picture>
       </div>
       <h1 class="sr-only">Wildfell Hall</h1>
-      <canvas id="desk" aria-label="Looking directly down at an antique ivory writing desk, with carved corner reliefs, gold script, and a light pink Aubusson-inspired floral carpet"></canvas>
+      <canvas id="desk" aria-label="An elevated view of an antique ivory writing desk, with visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, gold script, and a light pink floral carpet"></canvas>
+      <p id="desk-help" class="sr-only">Drag horizontally or use the left and right arrow keys to inspect the sides of the desk. Press Home to return to the centre.</p>
       <div class="room-vignette" aria-hidden="true"></div>
         <div class="desk-controls" role="group" aria-label="Room atmosphere" hidden>
           <button id="light-toggle" aria-label="Change to evening light" aria-pressed="false">
