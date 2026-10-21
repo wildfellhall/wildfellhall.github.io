@@ -7,10 +7,11 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "textures": "python3 scripts/make-materials.py && python3 scripts/make-drawer-materials.py && node scripts/make-ornaments.mjs && python3 scripts/make-control-frame.py",
+    "textures": "python3 scripts/make-materials.py && python3 scripts/make-drawer-materials.py && node scripts/make-ornaments.mjs && python3 scripts/make-control-linen.py",
     "drawer-textures": "python3 scripts/make-drawer-materials.py",
     "ornaments": "node scripts/make-ornaments.mjs",
     "fallback": "node scripts/capture-fallback.mjs",
+    "frame-fallback": "node scripts/capture-control-frame.mjs",
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {

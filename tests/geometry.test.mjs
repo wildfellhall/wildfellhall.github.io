@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { drawerTray } from '../src/drawer-tray.js';
 import { desktopOutline, sweptMolding } from '../src/furniture-profiles.js';
 import { createCarvings } from '../src/ornaments.js';
+import { createFrameMetalwork } from '../src/control-frame.js';
 
 test('drawer interiors form a closed shell with consistently facing surfaces', () => {
   for (const width of [4.13, 4.48]) {
@@ -53,4 +54,22 @@ test('all carved relief and edge beads produce finite renderable geometry', () =
   });
   assert.ok(meshes >= 5, 'Fixed relief and all drawer fronts must remain present');
   paint.dispose();
+});
+
+test('the cast metal frame has a closed molding and finite relief surfaces', () => {
+  const frame = createFrameMetalwork(), molding = frame.getObjectByName('continuous-cast-molding');
+  const edges = new Map();
+  for (let i = 0; i < molding.geometry.index.count; i += 3) {
+    const vertices = [0, 1, 2].map(j => molding.geometry.index.getX(i + j));
+    for (let j = 0; j < 3; j++) {
+      const edge = [vertices[j], vertices[(j + 1) % 3]].sort((a, b) => a - b).join(',');
+      edges.set(edge, (edges.get(edge) || 0) + 1);
+    }
+  }
+  assert.ok([...edges.values()].every(count => count === 2), 'The molding must close at every corner and around its section');
+  frame.traverse(object => {
+    if (!object.isMesh) return;
+    for (const key of ['position', 'normal']) assert.ok(object.geometry.attributes[key].array.every(Number.isFinite));
+    object.geometry.dispose(); object.material.dispose();
+  });
 });

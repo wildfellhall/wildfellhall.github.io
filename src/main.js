@@ -6,6 +6,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createDesk, createEnvironment, createFloor } from './desk.js';
 import { createCarpet } from './ornaments.js';
 import { createDeskInteraction } from './desk-interaction.js';
+import { createControlFrame } from './control-frame.js';
 
 const room = document.querySelector('#room'), canvas = document.querySelector('#desk');
 const status = document.querySelector('#render-status');
@@ -78,6 +79,10 @@ async function init() {
   const rim = new THREE.DirectionalLight('#fff3e3', .45);
   rim.position.set(-2, 6, -8); scene.add(rim);
   const [desk, carpet] = await Promise.all([createDesk(renderer), createCarpet(renderer)]);
+  const controlFrame = await createControlFrame(document.querySelector('.desk-controls')).catch(error => {
+    console.warn('Using the still metal frame:', error);
+    return null;
+  });
   // A room-size carpet keeps the elevated composition on the blush textile.
   carpet.scale.set(1.85, 1, 1.85); carpet.position.z = -3;
   scene.add(createFloor(), carpet, desk.group);
@@ -140,6 +145,7 @@ async function init() {
     const drawers = interaction.animateDrawers(delta, motionQuery.matches);
     if (drawers.changed) renderer.shadowMap.needsUpdate = true;
     composer.render();
+    controlFrame?.render(currentLight);
     interaction.projectButtons();
     const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentDetail - desiredDetail) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
     if (unsettled || drawers.unsettled) invalidate();

@@ -114,6 +114,24 @@ test('drawer motion can reverse, reduced motion settles it, and graphics recover
   assert.deepEqual(await drawerPoint(page, 1), open);
   await drawer.focus(); await page.keyboard.press('Enter'); await nextFrame(page);
   assert.equal(await drawer.getAttribute('aria-expanded'), 'false');
+  // Losing the small frame context must leave the desk and its controls usable.
+  await page.locator('.desk-controls.has-metal-frame').waitFor();
+  const frameBefore = await page.locator('#control-frame').evaluate(canvas => canvas.toDataURL());
+  await page.evaluate(() => {
+    window.frameRecoveryExtension = document.querySelector('#control-frame').getContext('webgl2').getExtension('WEBGL_lose_context');
+    window.frameRecoveryExtension.loseContext();
+  });
+  await page.waitForFunction(() => !document.querySelector('.desk-controls').classList.contains('has-metal-frame'));
+  assert.equal(await page.locator('#room.is-ready').count(), 1);
+  assert.equal(await page.locator('.desk-controls').isVisible(), true);
+  assert.equal(await page.locator('.desk-controls').evaluate(async element => {
+    const url = getComputedStyle(element, '::before').backgroundImage.match(/url\("?(.*?)"?\)/)[1];
+    const image = new Image(); image.src = url; await image.decode(); return image.naturalWidth;
+  }), 616, 'The fallback is a matching 2x render of the actual frame');
+  await page.evaluate(() => { window.frameRecoveryExtension.restoreContext(); delete window.frameRecoveryExtension; });
+  await page.locator('.desk-controls.has-metal-frame').waitFor();
+  assert.equal(await page.locator('#control-frame').evaluate(canvas => canvas.toDataURL()), frameBefore,
+    'Context recovery must restore the metal reflections as well as the geometry');
   await page.close();
 });
 
@@ -124,11 +142,15 @@ test('desk renders, atmosphere and close view work, and keyboard controls remain
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto(baseURL);
   await page.locator('#room.is-ready').waitFor();
+  await page.locator('.desk-controls.has-metal-frame').waitFor();
+  const dayFrame = await page.locator('#control-frame').evaluate(canvas => canvas.toDataURL());
   assert.equal((await page.locator('.desk-controls').innerText()).trim(), '', 'Controls must not add visible text over the desk');
   await page.screenshot({ path: 'test-results/desktop.png' });
   await page.getByRole('button', { name: 'Change to evening light' }).click();
   assert.equal(await page.getByRole('button', { name: 'Change to afternoon light' }).getAttribute('aria-pressed'), 'true');
   await page.screenshot({ path: 'test-results/evening.png' });
+  assert.notEqual(await page.locator('#control-frame').evaluate(canvas => canvas.toDataURL()), dayFrame,
+    'The metal frame must respond to the room lighting');
   await page.getByRole('button', { name: 'Look closer at the desk' }).click();
   assert.equal(await page.getByRole('button', { name: 'Return to the whole desk' }).getAttribute('aria-pressed'), 'true');
   await page.screenshot({ path: 'test-results/close.png' });
