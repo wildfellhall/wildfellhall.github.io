@@ -15,10 +15,15 @@ try {
     headless: true,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'],
   });
-  for (const [name, width, height, deviceScaleFactor] of [['desk-still', 1440, 1000, 1], ['desk-still-portrait', 390, 844, 2]]) {
+  // Capture portrait at the picture source's widest aspect ratio. object-fit:
+  // cover then crops its sides like the orthographic camera on narrower phones.
+  for (const [name, width, height, deviceScaleFactor] of [['desk-still', 1440, 1000, 1], ['desk-still-portrait', 630, 840, 2]]) {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor, reducedMotion: 'reduce' });
     await page.goto(url);
     await page.locator('#room.is-ready').waitFor({ timeout: 60000 });
+    // Element screenshots include overlapping siblings. Keep controls and the
+    // CSS vignette out of the still; the fallback supplies its own vignette.
+    await page.addStyleTag({ content: '.desk-controls, .room-vignette { visibility: hidden !important; }' });
     const capture = await page.locator('#desk').screenshot();
     await sharp(capture).webp({ quality: 92 }).toFile(new URL(`../public/materials/${name}.webp`, import.meta.url).pathname);
     console.log(`Captured ${name}.webp`);

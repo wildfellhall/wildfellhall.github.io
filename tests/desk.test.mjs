@@ -79,7 +79,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=overhead-1$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   await page.screenshot({ path: 'test-results/fallback.png' });
   await page.close();

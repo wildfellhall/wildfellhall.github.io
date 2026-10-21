@@ -24,7 +24,7 @@ viewButton.addEventListener('click', () => {
   viewButton.setAttribute('aria-pressed', String(close));
   viewButton.setAttribute('aria-label', close ? 'Return to the whole desk' : 'Look closer at the desk');
   room.classList.toggle('is-close', close);
-  status.textContent = close ? 'A closer view of the drawers and relief carving.' : 'The whole writing desk.';
+  status.textContent = close ? 'A closer overhead view of the writing surface.' : 'An overhead view of the writing desk.';
   engine?.invalidate();
 });
 
@@ -40,10 +40,11 @@ async function init() {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#b9afa0');
   scene.fog = new THREE.FogExp2('#b9afa0', .009);
-  const camera = new THREE.PerspectiveCamera(34, 1, .1, 160);
-  const baseTarget = new THREE.Vector3(0, -2.45, 0);
-  const direction = new THREE.Vector3(8.3, 9.6, 20).normalize();
-  let distance = 30;
+  const camera = new THREE.OrthographicCamera(-8.2, 8.2, 5.7, -5.7, .1, 80);
+  // The writing surface is the composition. Looking along -Y with -Z up
+  // keeps every desktop edge square to the screen, including during motion.
+  camera.up.set(0, 0, -1);
+  const baseTarget = new THREE.Vector3(0, .203, 0);
   createEnvironment(renderer, scene);
   const hemisphere = new THREE.HemisphereLight('#e9edf1', '#8d7561', .72);
   scene.add(hemisphere);
@@ -94,18 +95,12 @@ async function init() {
   function resize() {
     width = room.clientWidth; height = room.clientHeight;
     renderer.setSize(width, height, false); composer.setSize(width, height);
-    camera.aspect = width / height;
+    // A narrow carpet surround on desktop; portrait crops the sides instead
+    // of shrinking the writing surface into the middle of a large floor.
+    const aspect = width / height, viewHeight = Math.min(11.4, 16.4 / aspect);
+    camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
+    camera.top = viewHeight / 2; camera.bottom = -camera.top;
     camera.updateProjectionMatrix();
-    // Fit the entire piece of furniture in portrait as well as landscape.
-    const right = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), direction).normalize();
-    const up = new THREE.Vector3().crossVectors(direction, right).normalize();
-    const tanY = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)), tanX = tanY * camera.aspect;
-    distance = 0;
-    for (const x of [-7.85, 7.85]) for (const y of [-6.1, .35]) for (const z of [-3.95, 4.0]) {
-      const p = new THREE.Vector3(x, y, z).sub(baseTarget), depth = p.dot(direction);
-      distance = Math.max(distance, Math.abs(p.dot(right)) / tanX + depth, Math.abs(p.dot(up)) / tanY + depth);
-    }
-    distance *= 1.10;
     invalidate();
   }
   function invalidate() { if (!frame && !document.hidden) frame = requestAnimationFrame(render); }
@@ -125,9 +120,9 @@ async function init() {
     hemisphere.intensity = .72 - currentLight * .18;
     renderer.toneMappingExposure = .98 - currentLight * .08;
     const target = baseTarget.clone();
-    target.y += (currentZoom - 1) * 2.6; target.z += (currentZoom - 1) * 1.7;
-    camera.position.copy(target).addScaledVector(direction, distance);
-    camera.position.x += currentPointer.x * .26; camera.position.y += currentPointer.y * .14;
+    target.x += currentPointer.x * .07;
+    target.z += currentPointer.y * .05 - (currentZoom - 1) * 1.2;
+    camera.position.copy(target).add(new THREE.Vector3(0, 24, 0));
     camera.lookAt(target); camera.zoom = currentZoom; camera.updateProjectionMatrix();
     composer.render();
     const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentZoom - desiredZoom) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
