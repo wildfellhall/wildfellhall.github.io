@@ -1,7 +1,7 @@
 """Procedural ivory paint over close-grained drawer timber; no image inputs.
 
-The square maps represent 6.4 units of timber in each direction. Grain runs
-along U; the mesh UVs keep its scale and direction consistent on each board.
+The square maps represent 6.4 units of timber in each direction. The spatial
+material blends them continuously around the drawer's coved inner surface.
 Requires Pillow and NumPy only when regenerating the checked-in WebP assets.
 """
 from pathlib import Path
@@ -46,8 +46,9 @@ tone = (cloud - .5) * 7 + (paint - .5) * 3 + (brush - .5) * 2.4
 tone -= rings * 18 + fine * 5 + pores * 6.5
 tone += micro * .3
 albedo = Image.fromarray(np.uint8(np.clip(np.stack([237 + tone, 234 + tone, 227 + tone], axis=-1), 0, 255)))
-height = Image.fromarray(np.uint8(np.clip(159 - rings * 55 - fine * 17 - pores * 25 + (brush - .5) * 12 + micro, 0, 255)))
-roughness = Image.fromarray(np.uint8(np.clip(210 + (paint - .5) * 17 + rings * 16 + pores * 9 - (brush - .5) * 8, 0, 255)))
+shoulders = np.maximum(0, np.sin(phase * np.pi * 2)) ** 3
+height = Image.fromarray(np.uint8(np.clip(177 - shoulders * 24 - rings * 80 - fine * 17 - pores * 39 + (brush - .5) * 12 + micro, 0, 255)))
+roughness = Image.fromarray(np.uint8(np.clip(195 + (paint - .5) * 17 + rings * 31 + pores * 18 - (brush - .5) * 8, 0, 255)))
 
 # Sparse shallow scuffs disturb the paint's sheen more than its colour.
 hd = ImageDraw.Draw(height)
@@ -59,7 +60,7 @@ for _ in range(85):
     rd.line([(sx, sy), end], fill=184, width=1)
 
 albedo.save(OUT / 'drawer-ivory-color.webp', quality=94, method=6)
-height.save(OUT / 'drawer-ivory-height.webp', quality=92, method=6)
+height.save(OUT / 'drawer-ivory-height.webp', quality=96, method=6)
 roughness.resize((1024, 1024), Image.Resampling.LANCZOS).save(OUT / 'drawer-ivory-roughness.webp', quality=90, method=6)
 for name in ['color', 'height', 'roughness']:
     path = OUT / f'drawer-ivory-{name}.webp'

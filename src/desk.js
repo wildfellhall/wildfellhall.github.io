@@ -14,21 +14,21 @@ export async function createDesk(renderer) {
   writingSurface.name = 'writing-surface-objects'; group.add(writingSurface);
   const loader = new THREE.TextureLoader();
   const [[colorMap, bumpMap, roughnessMap], [drawerColor, drawerHeight, drawerRoughness]] = await Promise.all([
-    Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=grain-3`))),
-    Promise.all(['color', 'height', 'roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/drawer-ivory-${name}.webp?v=paint-1`))),
+    Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=relief-4`))),
+    Promise.all(['color', 'height', 'roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/drawer-ivory-${name}.webp?v=relief-2`))),
   ]);
   colorMap.colorSpace = THREE.SRGBColorSpace;
   drawerColor.colorSpace = THREE.SRGBColorSpace;
   for (const t of [colorMap, bumpMap, roughnessMap, drawerColor, drawerHeight, drawerRoughness]) t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   for (const t of [colorMap, bumpMap, roughnessMap, drawerColor, drawerHeight, drawerRoughness]) t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
   const painted = (color, roughness, bumpScale) => continuousWood(new THREE.MeshStandardMaterial({ color, map: colorMap, roughnessMap, roughness, bumpMap, bumpScale }), 18);
-  const paint = painted('#fffdf8', .86, .020);
-  const edge = painted('#f1ebdf', .82, .014);
-  const polishedEdge = painted('#fffdf8', .69, .012);
+  const paint = painted('#fffdf8', .87, .007);
+  const edge = painted('#f1ebdf', .85, .004);
+  const polishedEdge = painted('#fffdf8', .73, .004);
   const recess = new THREE.MeshStandardMaterial({ color: '#a79b86', roughness: .88 });
-  const panel = painted('#fffdf8', .89, .022);
-  const wood = painted('#fffdf8', .84, .030);
-  const drawerWood = continuousWood(new THREE.MeshStandardMaterial({ map: drawerColor, color: '#ffffff', bumpMap: drawerHeight, bumpScale: .025, roughnessMap: drawerRoughness, roughness: .90 }));
+  const panel = painted('#fffdf8', .89, .009);
+  const wood = painted('#fffdf8', .85, .012);
+  const drawerWood = continuousWood(new THREE.MeshStandardMaterial({ map: drawerColor, color: '#ffffff', bumpMap: drawerHeight, bumpScale: .008, roughnessMap: drawerRoughness, roughness: .91 }));
   drawerWood.userData.localWood = true;
   const brass = new THREE.MeshStandardMaterial({ color: '#9c7844', metalness: .84, roughness: .39 });
   const bronze = new THREE.MeshStandardMaterial({ color: '#655239', metalness: .73, roughness: .58 });
