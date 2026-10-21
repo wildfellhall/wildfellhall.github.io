@@ -66,10 +66,19 @@ function reverseWinding(geometry) {
 }
 
 // Rounded, undercut acanthus surfaces, not flat decals or line drawings.
-export function createCarvings(paint, edgePaint, patina) {
+export function createCarvings(paint, edgePaint, patina, drawerGroups) {
   const root = new THREE.Group();
   root.name = 'hand-carved-flowers-acanthus-and-shells';
   const parts = [[], [], []], finishes = [paint, edgePaint, patina];
+  function finishBatch(parent) {
+    for (let i = 0; i < parts.length; i++) if (parts[i].length) {
+      const mesh = new THREE.Mesh(mergeGeometries(parts[i]), finishes[i]);
+      mesh.name = 'ivory-relief';
+      mesh.castShadow = mesh.receiveShadow = true;
+      parent.add(mesh);
+      parts[i].forEach(g => g.dispose()); parts[i] = [];
+    }
+  }
   let frame = new THREE.Matrix4(), wrap = null;
   const at = (x, y, z = 0, angle = 0) => new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle), new THREE.Vector3(1, 1, 1));
@@ -173,6 +182,7 @@ export function createCarvings(paint, edgePaint, patina) {
       stroke([[side * 1.65, .20], [side * 1.43, .50], [side * 1.03, .15], [side * 1.35, .04]], .03);
       rose(side * 1.72, -.12, .14);
     }
+    finishBatch(drawerGroups[x < 0 ? 0 : 2]);
   }
   frame = at(0, -1.03, 3.470);
   rose(0, .12, .22);
@@ -180,6 +190,7 @@ export function createCarvings(paint, edgePaint, patina) {
     foliate([[side * .25, .14], [side * .48, .43], [side * .85, .40], [side * 1, .18]], 4, .25);
     foliate([[side * .25, -.25], [side * .8, -.46], [side * 1.45, -.42], [side * 1.85, -.13]], 5, .29);
   }
+  finishBatch(drawerGroups[1]);
   frame = at(0, -1.96, 3.367);
   for (const side of [-1, 1]) scroll(side, .02, 2.45);
   // A fan shell with deeply modelled ribs and a curled lower tip.
@@ -194,6 +205,22 @@ export function createCarvings(paint, edgePaint, patina) {
     for (const side of [-1, 1]) foliate([[0, 0], [side * .45, -.22], [side * 1.15, -.16], [side * 1.6, .06]], 4, .43);
     rose(0, -.06, .17);
   }
+  // The apron relief stays below the drawer runners. Ease only its highest
+  // curls down into the timber so they cannot pierce a sliding drawer bottom.
+  let crest = -Infinity;
+  for (const geometry of parts.flat()) {
+    geometry.computeBoundingBox(); crest = Math.max(crest, geometry.boundingBox.max.y);
+  }
+  const clearance = Math.min(1, .27 / (crest + 1.8));
+  for (const geometry of parts.flat()) {
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const y = positions.getY(i);
+      if (y > -1.8) positions.setY(i, -1.8 + (y + 1.8) * clearance);
+    }
+    geometry.computeVertexNormals();
+  }
+  finishBatch(root);
 
   // Knee rosettes, trailing acanthus, fine reeds and ankle buds all follow
   // the same curved cross-section as the leg, so none hover in front of it.
@@ -252,12 +279,7 @@ export function createCarvings(paint, edgePaint, patina) {
     const scale = i % 3 ? new THREE.Vector3(.042, .033, .026) : new THREE.Vector3(.018, .041, .024);
     add(new THREE.SphereGeometry(1, 10, 8), 0, new THREE.Matrix4().makeScale(scale));
   }
-  for (let i = 0; i < parts.length; i++) if (parts[i].length) {
-    const mesh = new THREE.Mesh(mergeGeometries(parts[i]), finishes[i]);
-    mesh.castShadow = mesh.receiveShadow = true;
-    root.add(mesh);
-    parts[i].forEach(g => g.dispose());
-  }
+  finishBatch(root);
   return root;
 }
 

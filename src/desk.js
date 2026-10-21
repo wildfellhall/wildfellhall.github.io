@@ -20,6 +20,8 @@ export async function createDesk(renderer) {
   const recess = new THREE.MeshStandardMaterial({ color: '#a79b86', roughness: .88 });
   const panel = new THREE.MeshStandardMaterial({ color: '#dbd4c5', roughness: .72, bumpMap, bumpScale: .025 });
   const wood = new THREE.MeshStandardMaterial({ map: colorMap, bumpMap, bumpScale: .045, roughnessMap, roughness: .84, color: '#f8f5ed' });
+  const drawerWood = new THREE.MeshStandardMaterial({ map: colorMap, color: '#c8ac85', bumpMap, bumpScale: .022, roughness: .83 });
+  const endGrain = new THREE.MeshStandardMaterial({ color: '#a88c67', bumpMap, bumpScale: .015, roughness: .86 });
   const brass = new THREE.MeshStandardMaterial({ color: '#9c7844', metalness: .84, roughness: .39 });
   const bronze = new THREE.MeshStandardMaterial({ color: '#655239', metalness: .73, roughness: .58 });
   const porcelain = new THREE.MeshPhysicalMaterial({ color: '#e9e2d4', roughness: .24, clearcoat: .55, clearcoatRoughness: .27 });
@@ -27,8 +29,8 @@ export async function createDesk(renderer) {
     const m = new THREE.Mesh(geometry, material); m.position.set(x, y, z);
     m.castShadow = m.receiveShadow = true; parent.add(m); return m;
   }
-  function block(w, h, d, x, y, z, material = paint, radius = .04) {
-    return mesh(new RoundedBoxGeometry(w, h, d, 3, radius), material, x, y, z);
+  function block(w, h, d, x, y, z, material = paint, radius = .04, parent = group) {
+    return mesh(new RoundedBoxGeometry(w, h, d, 3, radius), material, x, y, z, parent);
   }
   function top(w, d, y, thickness, bevel, material) {
     const g = new THREE.ExtrudeGeometry(desktopOutline(w, d), {
@@ -57,16 +59,41 @@ export async function createDesk(renderer) {
   ]), [polishedEdge, edge]).name = 'ogee-and-ovolo-edge-molding';
   top(15.18, 7.57, .175, .15, .028, [wood, paint]);
 
-  // A deeper frieze and separate fronts make the drawer joints legible.
-  block(14.48, 1.28, 6.42, 0, -.98, 0, recess);
+  // Hollow drawer bays, a back board and separate runners let the actual
+  // wooden boxes slide out from beneath the top.
+  block(14.48, 1.28, .16, 0, -.98, -3.13, recess);
   block(14.60, .10, 6.54, 0, -.36, 0, edge);
   block(14.52, .12, 6.50, 0, -1.61, 0, paint);
-  const drawers = [{ x: -4.82, w: 4.45 }, { x: 0, w: 4.80 }, { x: 4.82, w: 4.45 }];
-  for (const { x, w } of drawers) {
-    block(w, 1.13, .15, x, -.96, 3.29, paint, .055).name = 'drawer-front';
-    block(w - .19, .94, .055, x, -.96, 3.385, edge, .07);
-    block(w - .28, .84, .058, x, -.96, 3.423, paint, .065);
-    block(w - .39, .73, .018, x, -.96, 3.458, panel, .065);
+  for (const x of [-2.43, 2.43]) block(.14, 1.16, 6.25, x, -.98, 0, recess, .02);
+  const drawers = [{ x: -4.82, w: 4.45 }, { x: 0, w: 4.80 }, { x: 4.82, w: 4.45 }].map((spec, index) => {
+    const moving = new THREE.Group();
+    moving.name = `${['left', 'centre', 'right'][index]}-drawer`;
+    moving.userData.drawerIndex = index; group.add(moving);
+    return { ...spec, group: moving, open: false, travel: 2.65 };
+  });
+  for (const { x, w, group: moving } of drawers) {
+    block(w, 1.13, .15, x, -.96, 3.29, paint, .055, moving).name = 'drawer-front';
+    block(w - .19, .94, .055, x, -.96, 3.385, edge, .07, moving);
+    block(w - .28, .84, .058, x, -.96, 3.423, paint, .065, moving);
+    block(w - .39, .73, .018, x, -.96, 3.458, panel, .065, moving);
+    // An inset bottom, exposed side grain and rear wall enclose an empty tray.
+    block(w - .32, .10, 5.82, x, -1.41, .24, drawerWood, .012, moving);
+    block(w - .32, .86, .14, x, -.98, -2.60, drawerWood, .015, moving);
+    block(w - .32, .86, .10, x, -.98, 3.17, drawerWood, .012, moving);
+    for (const side of [-1, 1]) {
+      const wallX = x + side * (w / 2 - .24);
+      block(.16, .86, 5.82, wallX, -.98, .24, drawerWood, .012, moving);
+      block(.20, .08, 5.95, wallX, -1.50, .10, recess, .01);
+      // Shallow dovetail ends in the drawer sides, cut into their outer face.
+      for (let i = 0; i < 3; i++) {
+        const joint = new THREE.Shape();
+        joint.moveTo(-.10, -.075); joint.lineTo(.10, -.105);
+        joint.lineTo(.10, .105); joint.lineTo(-.10, .075); joint.closePath();
+        const geometry = new THREE.ExtrudeGeometry(joint, { depth: .006, bevelEnabled: false });
+        geometry.rotateY(side * Math.PI / 2);
+        mesh(geometry, endGrain, wallX + side * .079, -1.23 + i * .26, 3.04, moving);
+      }
+    }
   }
   for (const x of [-7.16, -2.43, 2.43, 7.16]) {
     block(.16, 1.24, .24, x, -.97, 3.32, edge, .025);
@@ -106,27 +133,32 @@ export async function createDesk(renderer) {
   }
 
   // Ivory porcelain cabinet knobs seated in chased brass rosettes.
-  function knob(x, y) {
+  function knob(x, y, parent) {
     const z = 3.51;
-    const plate = mesh(new THREE.SphereGeometry(1, 32, 20), bronze, x, y, z);
+    const hardware = new THREE.Group(); parent.add(hardware);
+    const part = (geometry, material, px, py, pz) => mesh(geometry, material, px, py, pz, hardware);
+    const plate = part(new THREE.SphereGeometry(1, 32, 20), bronze, x, y, z);
     plate.scale.set(.23, .25, .038);
-    const ring = mesh(new THREE.TorusGeometry(.19, .018, 10, 36), brass, x, y, z + .035);
+    part(new THREE.TorusGeometry(.19, .018, 10, 36), brass, x, y, z + .035);
     for (let i = 0; i < 12; i++) {
       const a = i * Math.PI / 6;
-      const petal = mesh(new THREE.SphereGeometry(1, 12, 8), brass, x + Math.sin(a) * .17, y + Math.cos(a) * .17, z + .047);
+      const petal = part(new THREE.SphereGeometry(1, 12, 8), brass, x + Math.sin(a) * .17, y + Math.cos(a) * .17, z + .047);
       petal.scale.set(.035, .048, .02); petal.rotation.z = -a;
     }
-    const neck = mesh(new THREE.CylinderGeometry(.067, .085, .16, 24), brass, x, y, z + .12); neck.rotation.x = Math.PI / 2;
-    const bulb = mesh(new THREE.SphereGeometry(1, 32, 24), porcelain, x, y, z + .24); bulb.scale.set(.185, .18, .135);
-    mesh(new THREE.TorusGeometry(.175, .012, 8, 32), brass, x, y, z + .245);
-    const face = mesh(new THREE.SphereGeometry(.024, 12, 8), brass, x, y, z + .374); face.scale.z = .5;
+    const neck = part(new THREE.CylinderGeometry(.067, .085, .16, 24), brass, x, y, z + .12); neck.rotation.x = Math.PI / 2;
+    const bulb = part(new THREE.SphereGeometry(1, 32, 24), porcelain, x, y, z + .24); bulb.scale.set(.185, .18, .135);
+    part(new THREE.TorusGeometry(.175, .012, 8, 32), brass, x, y, z + .245);
+    const face = part(new THREE.SphereGeometry(.024, 12, 8), brass, x, y, z + .374); face.scale.z = .5;
   }
-  for (const x of [-4.82, -1.34, 1.34, 4.82]) knob(x, -.93);
-  const keyplate = mesh(new THREE.SphereGeometry(1, 24, 16), brass, 0, -1.30, 3.50); keyplate.scale.set(.09, .13, .018);
-  mesh(new THREE.CircleGeometry(.025, 16), bronze, 0, -1.27, 3.522);
-  block(.025, .065, .006, 0, -1.31, 3.524, bronze, .004);
-  group.add(createCarvings(paint, edge, recess), await createEmbossing(DESK.surfaceY));
-  return { group, writingSurface };
+  for (const [i, xs] of [[0, [-4.82]], [1, [-1.34, 1.34]], [2, [4.82]]]) {
+    for (const x of xs) knob(x, -.93, drawers[i].group);
+  }
+  const centre = drawers[1].group;
+  const keyplate = mesh(new THREE.SphereGeometry(1, 24, 16), brass, 0, -1.30, 3.50, centre); keyplate.scale.set(.09, .13, .018);
+  mesh(new THREE.CircleGeometry(.025, 16), bronze, 0, -1.27, 3.522, centre);
+  block(.025, .065, .006, 0, -1.31, 3.524, bronze, .004, centre);
+  group.add(createCarvings(paint, edge, recess, drawers.map(drawer => drawer.group)), await createEmbossing(DESK.surfaceY));
+  return { group, writingSurface, drawers };
 }
 
 function taperedLeg({ curve, radius }) {
@@ -137,7 +169,8 @@ function taperedLeg({ curve, radius }) {
     for (let j = 0; j <= radialSegments; j++) {
       const theta = j / radialSegments * Math.PI * 2;
       const offset = frames.normals[i].clone().multiplyScalar(Math.cos(theta) * r).addScaledVector(frames.binormals[i], Math.sin(theta) * r);
-      positions.push(p.x + offset.x, p.y + offset.y, p.z + offset.z); uv.push(j / radialSegments, t);
+      // Seat the top of the leg within the lower rail, clear of the tray above.
+      positions.push(p.x + offset.x, Math.min(p.y + offset.y, -1.57), p.z + offset.z); uv.push(j / radialSegments, t);
       if (i < lengthSegments && j < radialSegments) {
         const a = i * (radialSegments + 1) + j, b = a + radialSegments + 1;
         indices.push(a, a + 1, b, b, a + 1, b + 1);

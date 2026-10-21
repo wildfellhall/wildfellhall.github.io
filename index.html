@@ -13,16 +13,21 @@
     <main id="room" aria-label="An antique white wooden writing desk">
       <div id="desk-fallback" aria-hidden="true">
         <picture>
-          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=carving-3" />
-          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=carving-3" />
-          <img src="./materials/desk-still.webp?v=carving-3" alt="" fetchpriority="high" />
+          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=interactive-4" />
+          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=interactive-4" />
+          <img src="./materials/desk-still.webp?v=interactive-4" alt="" fetchpriority="high" />
         </picture>
       </div>
       <h1 class="sr-only">Wildfell Hall</h1>
-      <canvas id="desk" aria-label="An elevated view of an antique ivory writing desk, with visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, gold script, and a light pink floral carpet"></canvas>
-      <p id="desk-help" class="sr-only">Drag horizontally or use the left and right arrow keys to inspect the sides of the desk. Press Home to return to the centre.</p>
+      <canvas id="desk" aria-describedby="desk-help" aria-label="An elevated view of an antique ivory writing desk, with visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, gold script, and a light pink floral carpet"></canvas>
+      <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space.</p>
+      <div id="drawer-controls" role="group" aria-label="Desk drawers" hidden>
+        <button class="drawer-hotspot" aria-label="Open left drawer" aria-expanded="false"></button>
+        <button class="drawer-hotspot" aria-label="Open centre drawer" aria-expanded="false"></button>
+        <button class="drawer-hotspot" aria-label="Open right drawer" aria-expanded="false"></button>
+      </div>
       <div class="room-vignette" aria-hidden="true"></div>
-        <div class="desk-controls" role="group" aria-label="Room atmosphere" hidden>
+        <div class="desk-controls" role="group" aria-label="Desk view and lighting" hidden>
           <button id="light-toggle" aria-label="Change to evening light" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
           </button>
@@ -30,9 +35,19 @@
           <button id="view-toggle" aria-label="Look closer at the desk" aria-pressed="false">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true"><path d="M9 4H4v5m11-5h5v5M4 15v5h5m11-5v5h-5"/><path d="m8 8 8 8m-8 0 8-8" opacity=".4"/></svg>
           </button>
+          <span class="control-divider" aria-hidden="true"></span>
+          <button id="zoom-out" aria-label="Zoom out" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true"><path d="M5 12h14"/></svg>
+          </button>
+          <button id="zoom-in" aria-label="Zoom in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true"><path d="M5 12h14m-7-7v14"/></svg>
+          </button>
+          <button id="view-reset" aria-label="Reset view">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true"><path d="M5 8a8 8 0 1 1-1 7m1-12v5h5"/></svg>
+          </button>
         </div>
       <p id="render-status" class="sr-only" role="status" aria-live="polite">Preparing the writing room.</p>
-      <noscript><p class="sr-only">A still version of the writing desk. Enable JavaScript for lighting and camera controls.</p></noscript>
+      <noscript><p class="sr-only">A still version of the writing desk. Enable JavaScript for lighting, zoom, and opening drawers.</p></noscript>
     </main>
     <script type="module" src="/src/main.js"></script>
   </body>

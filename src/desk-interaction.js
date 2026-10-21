@@ -1,0 +1,187 @@
+import * as THREE from 'three';
+
+// The camera stays square to the furniture. Inspection moves within its image
+// plane, so dragging and zooming cannot tip the desk relative to the carpet.
+export function createDeskInteraction({ canvas, room, camera, desk, status, invalidate, resetView }) {
+  const zoomIn = document.querySelector('#zoom-in'), zoomOut = document.querySelector('#zoom-out');
+  const drawerControls = document.querySelector('#drawer-controls');
+  const buttons = [...drawerControls.querySelectorAll('button')];
+  const names = ['left', 'centre', 'right'];
+  const pan = new THREE.Vector2(), pointers = new Map(), raycaster = new THREE.Raycaster();
+  const pickMeshes = [];
+  desk.group.traverse(object => {
+    // Relief follows the backing timber, whose simpler surfaces provide the
+    // same picking area without testing every small carved leaf on each move.
+    if (object.isMesh && object.name !== 'ivory-relief') pickMeshes.push(object);
+  });
+  let zoom = 1, gesture = null, enabled = false;
+  const MIN_ZOOM = 1, MAX_ZOOM = 2.8;
+  const size = () => canvas.getBoundingClientRect();
+  const visible = () => new THREE.Vector2((camera.right - camera.left) / camera.zoom, (camera.top - camera.bottom) / camera.zoom);
+  function limits() {
+    const view = visible(), cropped = 8.1 - view.x / 2;
+    return new THREE.Vector2(cropped > 0 ? Math.min(6.6, cropped + 1.2) : 0, Math.max(0, 6.1 - view.y / 2));
+  }
+  function clampPan() {
+    const limit = limits();
+    pan.x = THREE.MathUtils.clamp(pan.x, -limit.x, limit.x);
+    pan.y = THREE.MathUtils.clamp(pan.y, -limit.y, limit.y);
+  }
+  function setZoom(value, anchor) {
+    if (!enabled) return;
+    const next = THREE.MathUtils.clamp(value, MIN_ZOOM, MAX_ZOOM), rect = size(), before = visible();
+    const ratio = next / zoom;
+    // Keep the point under the mouse or pinch midpoint stationary.
+    if (anchor) {
+      pan.x += ((anchor.x - rect.left) / rect.width - .5) * before.x * (1 - 1 / ratio);
+      pan.y += (.5 - (anchor.y - rect.top) / rect.height) * before.y * (1 - 1 / ratio);
+    }
+    camera.zoom *= ratio; zoom = next;
+    clampPan(); invalidate();
+    zoomIn.disabled = zoom >= MAX_ZOOM - .001;
+    zoomOut.disabled = zoom <= MIN_ZOOM + .001;
+  }
+  function reset() {
+    resetView(); setZoom(1); pan.set(0, 0); invalidate();
+  }
+  function hitDrawer(x, y) {
+    const rect = size();
+    raycaster.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2), camera);
+    const hit = raycaster.intersectObjects(pickMeshes, false)[0];
+    // Respect occlusion: clicking the top above a closed drawer does nothing.
+    for (let object = hit?.object; object; object = object.parent) {
+      if (object.userData.drawerIndex !== undefined) return object.userData.drawerIndex;
+    }
+    return -1;
+  }
+  function toggleDrawer(index) {
+    if (!enabled) return;
+    const drawer = desk.drawers[index]; drawer.open = !drawer.open;
+    buttons[index].setAttribute('aria-expanded', String(drawer.open));
+    buttons[index].setAttribute('aria-label', `${drawer.open ? 'Close' : 'Open'} ${names[index]} drawer`);
+    status.textContent = `The ${names[index]} drawer is ${drawer.open ? 'open' : 'closed'}.`;
+    invalidate();
+  }
+  function anchorFor(index) {
+    const drawer = desk.drawers[index];
+    return new THREE.Vector3(index === 1 ? -1.34 : drawer.x, -.93, 3.884 + drawer.group.position.z);
+  }
+  buttons.forEach((button, index) => {
+    button.addEventListener('click', () => toggleDrawer(index));
+    button.addEventListener('focus', () => {
+      const point = anchorFor(index).project(camera);
+      // A keyboard user can reach a drawer outside a cropped phone view.
+      const view = visible();
+      if (Math.abs(point.x) > .85) pan.x += point.x * view.x / 2;
+      if (Math.abs(point.y) > .80) pan.y += point.y * view.y / 2;
+      clampPan(); invalidate();
+    });
+  });
+  zoomIn.addEventListener('click', () => setZoom(zoom * 1.25));
+  zoomOut.addEventListener('click', () => setZoom(zoom / 1.25));
+  document.querySelector('#view-reset').addEventListener('click', reset);
+  canvas.addEventListener('wheel', event => {
+    if (!enabled) return;
+    event.preventDefault();
+    const pixels = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? size().height : 1);
+    setZoom(zoom * Math.exp(-THREE.MathUtils.clamp(pixels, -250, 250) * .002), { x: event.clientX, y: event.clientY });
+  }, { passive: false });
+  function midpoint() {
+    const points = [...pointers.values()];
+    if (points.length === 1) return { x: points[0].x, y: points[0].y, span: 0 };
+    return { x: (points[0].x + points[1].x) / 2, y: (points[0].y + points[1].y) / 2,
+      span: Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y) };
+  }
+  canvas.addEventListener('pointerdown', event => {
+    if (!enabled || event.button !== 0) return;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    canvas.setPointerCapture(event.pointerId);
+    const multi = pointers.size > 1;
+    gesture = { previous: midpoint(), start: midpoint(), moved: multi, drawer: multi ? -1 : hitDrawer(event.clientX, event.clientY) };
+  });
+  canvas.addEventListener('pointermove', event => {
+    if (!enabled) return;
+    if (!pointers.has(event.pointerId)) {
+      room.classList.toggle('is-drawer-hover', event.pointerType !== 'touch' && hitDrawer(event.clientX, event.clientY) >= 0);
+      return;
+    }
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const point = midpoint(), previous = gesture.previous;
+    if (!gesture.moved && Math.hypot(point.x - gesture.start.x, point.y - gesture.start.y) < 6) return;
+    gesture.moved = true;
+    const rect = size(), view = visible();
+    pan.x -= (point.x - previous.x) / rect.width * view.x;
+    pan.y += (point.y - previous.y) / rect.height * view.y;
+    if (point.span > 0 && previous.span > 0) setZoom(zoom * point.span / previous.span, point);
+    clampPan(); gesture.previous = point;
+    room.classList.add('is-dragging'); invalidate();
+  });
+  function release(event, cancelled = false) {
+    if (!pointers.has(event.pointerId)) return;
+    const click = !cancelled && !gesture.moved && pointers.size === 1;
+    const drawer = gesture.drawer;
+    pointers.delete(event.pointerId);
+    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    if (pointers.size) gesture = { previous: midpoint(), start: midpoint(), moved: true, drawer: -1 };
+    else { gesture = null; room.classList.remove('is-dragging'); }
+    if (click && drawer >= 0 && hitDrawer(event.clientX, event.clientY) === drawer) toggleDrawer(drawer);
+  }
+  canvas.addEventListener('pointerup', event => release(event));
+  canvas.addEventListener('pointercancel', event => release(event, true));
+  canvas.addEventListener('lostpointercapture', event => release(event, true));
+  canvas.addEventListener('pointerleave', () => room.classList.remove('is-drawer-hover'));
+  canvas.addEventListener('keydown', event => {
+    if (!enabled || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', 'Home'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Home') reset();
+    else if (['+', '=', '-'].includes(event.key)) setZoom(zoom * (event.key === '-' ? 1 / 1.25 : 1.25));
+    else {
+      if (event.key === 'ArrowLeft') pan.x -= .9;
+      if (event.key === 'ArrowRight') pan.x += .9;
+      if (event.key === 'ArrowUp') pan.y += .9;
+      if (event.key === 'ArrowDown') pan.y -= .9;
+      clampPan(); invalidate();
+    }
+  });
+  return {
+    get dragging() { return pointers.size > 0; },
+    setEnabled(value) {
+      enabled = value; drawerControls.hidden = !value;
+      canvas.tabIndex = value ? 0 : -1;
+      if (!value) {
+        for (const id of pointers.keys()) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+        pointers.clear(); gesture = null;
+        room.classList.remove('is-dragging', 'is-drawer-hover');
+      }
+    },
+    applyCamera(target, direction, detail) {
+      camera.zoom = zoom * (1 + detail * .14); clampPan();
+      target.x += pan.x;
+      target.addScaledVector(new THREE.Vector3(0, direction.z, -direction.y), pan.y);
+      room.classList.toggle('is-pannable', limits().lengthSq() > .01);
+    },
+    animateDrawers(delta, reducedMotion) {
+      let changed = false, unsettled = false;
+      const factor = reducedMotion ? 1 : 1 - Math.exp(-delta * 10);
+      for (const drawer of desk.drawers) {
+        const target = drawer.open ? drawer.travel : 0, previous = drawer.group.position.z;
+        let next = THREE.MathUtils.lerp(previous, target, factor);
+        if (Math.abs(next - target) < .001) next = target;
+        drawer.group.position.z = next;
+        changed ||= next !== previous; unsettled ||= next !== target;
+      }
+      return { changed, unsettled };
+    },
+    projectButtons() {
+      const rect = size();
+      buttons.forEach((button, index) => {
+        const point = anchorFor(index).project(camera);
+        // Keep invisible keyboard targets inside the viewport. Otherwise Tab
+        // can scroll the entire clipped room before focus recenters the camera.
+        button.style.left = `${THREE.MathUtils.clamp((point.x + 1) * rect.width / 2, 26, rect.width - 26)}px`;
+        button.style.top = `${THREE.MathUtils.clamp((1 - point.y) * rect.height / 2, 26, rect.height - 26)}px`;
+      });
+    },
+  };
+}

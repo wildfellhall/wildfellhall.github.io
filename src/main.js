@@ -5,6 +5,7 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { createDesk, createEnvironment, createFloor } from './desk.js';
 import { createCarpet } from './ornaments.js';
+import { createDeskInteraction } from './desk-interaction.js';
 
 const room = document.querySelector('#room'), canvas = document.querySelector('#desk');
 const status = document.querySelector('#render-status');
@@ -19,14 +20,15 @@ lightButton.addEventListener('click', () => {
   status.textContent = evening ? 'Warm evening light.' : 'Soft afternoon light.';
   engine?.invalidate();
 });
-viewButton.addEventListener('click', () => {
-  close = !close;
+function setDetail(value) {
+  close = value;
   viewButton.setAttribute('aria-pressed', String(close));
   viewButton.setAttribute('aria-label', close ? 'Return to the whole desk' : 'Look closer at the desk');
   room.classList.toggle('is-close', close);
   status.textContent = close ? 'A closer view of the carved drawers, porcelain knobs, and cabriole legs.' : 'An elevated view of the antique writing desk.';
   engine?.invalidate();
-});
+}
+viewButton.addEventListener('click', () => setDetail(!close));
 
 async function init() {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
@@ -45,8 +47,8 @@ async function init() {
   // The detail view lowers the eye to the drawer fronts instead of zooming
   // further into an empty patch of the writing surface.
   const baseTarget = new THREE.Vector3(0, -2.3, 0);
-  const overviewDirection = new THREE.Vector3(2, 22, 17).normalize();
-  const detailDirection = new THREE.Vector3(3, 15, 23).normalize();
+  const overviewDirection = new THREE.Vector3(0, 22, 17).normalize();
+  const detailDirection = new THREE.Vector3(0, 15, 23).normalize();
   createEnvironment(renderer, scene);
   const hemisphere = new THREE.HemisphereLight('#e9edf1', '#8d7561', .42);
   scene.add(hemisphere);
@@ -92,9 +94,12 @@ async function init() {
   composer.addPass(ao); composer.addPass(new OutputPass());
 
   let width = 0, height = 0, frame = 0, lastTime = 0;
+  let graphicsAvailable = true;
   let currentLight = 0, currentDetail = 0;
-  let pan = 0, drag = null;
   const pointer = new THREE.Vector2(), currentPointer = new THREE.Vector2();
+  const interaction = createDeskInteraction({ canvas, room, camera, desk, status, invalidate, resetView: () => {
+    setDetail(false); pointer.set(0, 0); currentPointer.set(0, 0);
+  } });
   const afternoon = new THREE.Color('#fff0d6'), dusk = new THREE.Color('#ffcb94');
   const sky = new THREE.Color('#e9edf1'), duskSky = new THREE.Color('#b9c0d0');
   function resize() {
@@ -108,17 +113,7 @@ async function init() {
     camera.updateProjectionMatrix();
     invalidate();
   }
-  function panLimit() {
-    const cropped = 8.1 - (camera.right - camera.left) / (2 * camera.zoom);
-    // A little travel past the edge brings the outer knob and carved knee
-    // into the centre of a phone, clear of the floating atmosphere controls.
-    return cropped > 0 ? Math.min(6.6, cropped + 1.2) : 0;
-  }
-  function setPan(value) {
-    pan = THREE.MathUtils.clamp(value, -panLimit(), panLimit());
-    invalidate();
-  }
-  function invalidate() { if (!frame && !document.hidden) frame = requestAnimationFrame(render); }
+  function invalidate() { if (!frame && !document.hidden && graphicsAvailable) frame = requestAnimationFrame(render); }
   function render(now) {
     frame = 0;
     const delta = Math.min((now - (lastTime || now - 16)) / 1000, .05); lastTime = now;
@@ -139,68 +134,43 @@ async function init() {
     target.y -= currentDetail * .15;
     target.z += currentPointer.y * .05 + currentDetail * 1.2;
     const direction = overviewDirection.clone().lerp(detailDirection, currentDetail).normalize();
-    camera.zoom = 1 + currentDetail * .14;
-    pan = THREE.MathUtils.clamp(pan, -panLimit(), panLimit());
-    const right = new THREE.Vector3(direction.z, 0, -direction.x).normalize();
-    target.addScaledVector(right, pan);
+    interaction.applyCamera(target, direction, currentDetail);
     camera.position.copy(target).addScaledVector(direction, 28);
-    camera.lookAt(target); camera.updateProjectionMatrix();
-    const pannable = panLimit() > .1;
-    room.classList.toggle('is-pannable', pannable);
-    canvas.tabIndex = pannable ? 0 : -1;
-    if (pannable) canvas.setAttribute('aria-describedby', 'desk-help');
-    else canvas.removeAttribute('aria-describedby');
+    camera.lookAt(target); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+    const drawers = interaction.animateDrawers(delta, motionQuery.matches);
+    if (drawers.changed) renderer.shadowMap.needsUpdate = true;
     composer.render();
+    interaction.projectButtons();
     const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentDetail - desiredDetail) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
-    if (unsettled) invalidate();
+    if (unsettled || drawers.unsettled) invalidate();
   }
   room.addEventListener('pointermove', event => {
-    if (drag || motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
+    if (interaction.dragging || motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
     pointer.set((event.clientX / width - .5) * 2, (event.clientY / height - .5) * 2); invalidate();
   }, { passive: true });
   room.addEventListener('pointerleave', () => { pointer.set(0, 0); invalidate(); });
-  canvas.addEventListener('pointerdown', event => {
-    if (!event.isPrimary || event.button !== 0 || panLimit() <= .1) return;
-    drag = { id: event.pointerId, x: event.clientX, pan };
-    pointer.set(0, 0);
-    canvas.setPointerCapture(event.pointerId);
-    room.classList.add('is-dragging');
-  });
-  canvas.addEventListener('pointermove', event => {
-    if (!drag || event.pointerId !== drag.id) return;
-    const visibleWidth = (camera.right - camera.left) / camera.zoom;
-    setPan(drag.pan - (event.clientX - drag.x) / width * visibleWidth);
-  });
-  const endDrag = () => { drag = null; room.classList.remove('is-dragging'); };
-  canvas.addEventListener('lostpointercapture', endDrag);
-  canvas.addEventListener('pointercancel', endDrag);
-  canvas.addEventListener('pointerup', event => {
-    if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-    endDrag();
-  });
-  canvas.addEventListener('keydown', event => {
-    if (!['ArrowLeft', 'ArrowRight', 'Home'].includes(event.key)) return;
-    event.preventDefault();
-    setPan(event.key === 'Home' ? 0 : pan + (event.key === 'ArrowRight' ? .9 : -.9));
-  });
+  canvas.addEventListener('pointerdown', () => { pointer.set(0, 0); invalidate(); });
   motionQuery.addEventListener('change', () => { pointer.set(0, 0); invalidate(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { cancelAnimationFrame(frame); frame = 0; }
     else { lastTime = 0; invalidate(); }
   });
   canvas.addEventListener('webglcontextlost', event => {
-    event.preventDefault(); cancelAnimationFrame(frame); frame = 0;
-    endDrag(); canvas.tabIndex = -1;
+    event.preventDefault(); graphicsAvailable = false; cancelAnimationFrame(frame); frame = 0;
+    interaction.setEnabled(false);
     room.classList.remove('is-ready'); document.querySelector('.desk-controls').hidden = true;
     status.textContent = 'Showing the still desk while the graphics connection recovers.';
   });
   canvas.addEventListener('webglcontextrestored', () => {
+    graphicsAvailable = true; lastTime = 0;
     renderer.shadowMap.needsUpdate = true; room.classList.add('is-ready');
-    document.querySelector('.desk-controls').hidden = false; invalidate();
+    interaction.setEnabled(true); document.querySelector('.desk-controls').hidden = false; invalidate();
+    status.textContent = 'The writing room is ready.';
   });
   new ResizeObserver(resize).observe(room); resize();
   render(performance.now());
   room.classList.add('is-ready'); document.querySelector('.desk-controls').hidden = false;
+  interaction.setEnabled(true);
   status.textContent = 'The writing room is ready.';
   return { invalidate };
 }
@@ -210,4 +180,5 @@ init().then(result => { engine = result; }).catch(error => {
   status.textContent = 'Showing a still version of the writing desk.';
   lightButton.disabled = viewButton.disabled = true;
   document.querySelector('.desk-controls').hidden = true;
+  document.querySelector('#drawer-controls').hidden = true;
 });
