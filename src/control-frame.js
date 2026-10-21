@@ -101,44 +101,87 @@ export function createFrameMetalwork() {
     const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
     add(new THREE.TubeGeometry(curve, 36, radius, 10, false));
   }
+  // Reflect the ornament's placement, not its mesh: the relief keeps outward
+  // facing normals and catches the same light on all four sides of the frame.
+  function leaf(length, width, height, x, y, z, angle, sx = 1, sy = 1) {
+    add(leafGeometry(length, width, height), sx * x, sy * y, z,
+      Math.atan2(sy * Math.sin(angle), sx * Math.cos(angle)));
+  }
+  function scroll(points, sx, sy, radius = .55) {
+    stem(points.map(([x, y, z]) => [sx * x, sy * y, z]), radius);
+  }
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
     const x = sx * 139, y = sy * 23;
-    add(leafGeometry(23, 3.5, 1.8), x, y, 2.7, sx === 1 ? Math.PI : 0);
-    add(leafGeometry(17, 3.2, 1.7), x, y, 2.7, sy === 1 ? -Math.PI / 2 : Math.PI / 2);
-    // A rounded volute joins the two leaves, rooted in the molding.
+    // Layered acanthus fans follow the corner, with a low outer leaf behind
+    // the taller central fold. Their roots sink into the continuous molding.
+    leaf(22, 2.5, 1.35, 139, 23.7, 2.45, Math.PI - .32, sx, sy);
+    leaf(16, 2.0, 1.15, 137, 23.5, 2.7, Math.PI + .17, sx, sy);
+    leaf(25, 3.0, 1.9, 139, 23, 2.85, Math.PI - .06, sx, sy);
+    leaf(18, 2.2, 1.35, 140, 23, 2.45, -Math.PI / 2 + .24, sx, sy);
+    leaf(13, 1.8, 1.1, 139, 21, 2.65, -Math.PI / 2 - .13, sx, sy);
+    leaf(19, 2.5, 1.8, 139, 23, 2.85, -Math.PI / 2 + .04, sx, sy);
+    // A rounded volute joins the two fans, rooted in the molding.
     stem([[x - sx * 4, y + sy * 1, 3.2], [x - sx * 1, y + sy * 5, 3.7],
       [x + sx * 4, y + sy * 4, 3.7], [x + sx * 5, y, 3.6],
       [x + sx * 2, y - sy * 2, 3.4], [x, y, 3.0]], .7);
-    add(new THREE.SphereGeometry(1, 16, 12), x, y, 3.2, 0, 2.1, 2.1, 1.2);
+    for (let petal = 0; petal < 7; petal++) {
+      add(leafGeometry(2.8, .78, .7), x, y, 3.35, petal * Math.PI * 2 / 7);
+    }
+    add(new THREE.SphereGeometry(1, 16, 12), x, y, 3.8, 0, 1.05, 1.05, .7);
   }
-  // Spacious foliate scrolls leave the broad metal molding legible.
-  for (const side of [-1, 1]) for (const sy of [-1, 1]) {
-    const x = side * 64, y = sy * 25;
-    stem([[x - 19, y, 3.0], [x - 10, y + sy * 2, 3.4], [x, y - sy * 1.1, 3.4],
-      [x + 9, y + sy * 1.5, 3.5], [x + 15, y + sy * 2, 3.6], [x + 16, y - sy * 1, 3.4],
-      [x + 12, y - sy * 2, 3.3], [x + 11, y, 3.0]], .5);
-    add(leafGeometry(8, 1.7, .9), x - 11, y + sy * .4, 3.0, sy * .22);
-    add(leafGeometry(6, 1.5, .8), x + 2, y - sy * .7, 3.0, Math.PI + sy * .25);
+  // Symmetrical foliate sprays have space between their leaves so the broad
+  // ovolo's uninterrupted highlights still describe the underlying casting.
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    scroll([[38, 25, 2.9], [49, 28, 3.6], [62, 23.8, 3.7], [76, 27.4, 3.6],
+      [87, 28.3, 3.5], [93, 25.7, 3.7], [90, 23.3, 3.6], [87, 24.5, 3.5],
+      [88, 26, 3.3]], sx, sy, .5);
+    leaf(12, 2.3, 1.25, 48, 26.5, 3.0, .37, sx, sy);
+    leaf(12, 2.1, 1.2, 66, 25, 3.1, Math.PI + .23, sx, sy);
+    leaf(10, 2.0, 1.2, 73, 26.5, 3.0, -.23, sx, sy);
+    leaf(9, 1.7, 1.05, 80, 28, 2.9, .25, sx, sy);
+    leaf(8, 1.4, .85, 43, 26.4, 2.9, Math.PI + .1, sx, sy);
+    leaf(7, 1.5, .9, 96, 25.5, 2.9, .12, sx, sy);
   }
-  // Shell crest: a fluted fan with a rounded, scalloped outer edge.
+  // A fluted shell and paired C-scrolls form a connected central crest.
   for (const sy of [-1, 1]) {
-    const scale = sy === 1 ? 1 : .73;
-    for (let rib = -3; rib <= 3; rib++) {
-      const angle = rib * .23, length = (8.5 - Math.abs(rib) * .4) * scale;
-      add(leafGeometry(length, 1.2 * scale, 1.1 * scale), 0, sy * 29, 2.4,
+    const scale = sy === 1 ? 1 : .83;
+    for (const sx of [-1, 1]) {
+      scroll([[1, 28, 2.9], [7, 27.5, 3.5], [12, 32, 3.7], [18, 32.5, 3.7],
+        [21, 29, 3.6], [18, 26.8, 3.5], [15.5, 28.3, 3.5], [17, 29.5, 3.3]], sx, sy, .65);
+      leaf(12, 2.3, 1.25, 7, 28.5, 2.7, -.18, sx, sy);
+      leaf(8, 1.6, 1.0, 20, 28, 2.7, -.12, sx, sy);
+    }
+    for (let rib = -4; rib <= 4; rib++) {
+      const angle = rib * .21, length = (10.5 - Math.abs(rib) * .5) * scale;
+      add(leafGeometry(length, 1.35 * scale, 1.25 * scale), 0, sy * 28, 2.6,
         sy * Math.PI / 2 + angle, 1, 1, 1);
     }
-    add(new THREE.SphereGeometry(1, 16, 12), 0, sy * 29, 3.1, 0, 2.1, 1.2, 1.1);
+    add(new THREE.SphereGeometry(1, 16, 12), 0, sy * 28, 3.25, 0, 2.0, 1.25, 1.0);
   }
   const carving = new THREE.Mesh(mergeGeometries(relief), brass); carving.name = 'cast-acanthus-and-scrollwork';
   relief.forEach(g => g.dispose()); group.add(carving);
-  const beads = new THREE.InstancedMesh(new THREE.SphereGeometry(.64, 10, 8), polished, 124);
+  const beadOutline = roundedRectangle(274, 40.2, 5.5);
+  const beadCount = Math.round(beadOutline.getLength() / 3.5);
+  const beads = new THREE.InstancedMesh(new THREE.SphereGeometry(.6, 10, 8), polished, beadCount);
   beads.name = 'inner-bead-molding';
-  const matrix = new THREE.Matrix4(); let bead = 0;
-  for (const sy of [-1, 1]) for (let i = 0; i < 62; i++) {
-    matrix.makeTranslation(-128.1 + i * 4.2, sy * 20.1, 1.7); beads.setMatrixAt(bead++, matrix);
+  const matrix = new THREE.Matrix4();
+  for (let i = 0; i < beadCount; i++) {
+    const point = beadOutline.getPointAt(i / beadCount);
+    matrix.makeTranslation(point.x, point.y, 1.7); beads.setMatrixAt(i, matrix);
   }
   group.add(beads);
+  // Fine diagonal chasing sits in the outer lip, below the foliate relief.
+  // Instancing keeps this continuous perimeter detail to a single draw call.
+  const chasedOutline = roundedRectangle(294, 60, 14), chaseCount = Math.round(chasedOutline.getLength() / 2.15);
+  const chasing = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), brass, chaseCount);
+  chasing.name = 'chased-outer-fillet';
+  const rotation = new THREE.Quaternion(), axis = new THREE.Vector3(0, 0, 1), scale = new THREE.Vector3(.85, .28, .26);
+  for (let i = 0; i < chaseCount; i++) {
+    const t = i / chaseCount, point = chasedOutline.getPointAt(t), tangent = chasedOutline.getTangentAt(t);
+    rotation.setFromAxisAngle(axis, Math.atan2(tangent.y, tangent.x) - .48);
+    matrix.compose(new THREE.Vector3(point.x, point.y, 1.65), rotation, scale); chasing.setMatrixAt(i, matrix);
+  }
+  group.add(chasing);
   group.traverse(object => { if (object.isMesh) object.castShadow = object.receiveShadow = true; });
   return group;
 }

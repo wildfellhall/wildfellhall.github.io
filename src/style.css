@@ -15,8 +15,8 @@ button:focus-visible { outline: 2px solid #947039; outline-offset: 5px; border-r
 .drawer-hotspot:focus-visible { outline: 2px solid #947039; outline-offset: 4px; border-radius: 50%; background: #fff8e822; }
 .room-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 47% 42%, transparent 40%, #302d2312 100%); z-index: 1; }
 .desk-controls { position: absolute; z-index: 3; right: max(20px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 2px; width: min(308px, calc(100% - 28px)); height: 86px; padding: 22px 22px 20px; color: #694820; isolation: isolate; filter: drop-shadow(0 3px 2px #3f291f36) drop-shadow(0 7px 9px #3f291f18); }
-.desk-controls::before { content: ''; position: absolute; z-index: -1; inset: 0; background: url('/materials/control-frame-day.webp?v=cast-1') center / 100% 100% no-repeat; pointer-events: none; }
-.is-evening .desk-controls::before { background-image: url('/materials/control-frame-evening.webp?v=cast-1'); }
+.desk-controls::before { content: ''; position: absolute; z-index: -1; inset: 0; background: url('/materials/control-frame-day.webp?v=cast-2') center / 100% 100% no-repeat; pointer-events: none; }
+.is-evening .desk-controls::before { background-image: url('/materials/control-frame-evening.webp?v=cast-2'); }
 .desk-controls.has-metal-frame::before { opacity: 0; }
 #control-frame { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; pointer-events: none; opacity: 0; }
 .has-metal-frame #control-frame { opacity: 1; }
