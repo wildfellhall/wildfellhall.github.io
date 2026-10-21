@@ -179,7 +179,7 @@ export function createCarvings(paint, edgePaint, patina) {
 
 export async function createCarpet(renderer) {
   const loader = new THREE.TextureLoader();
-  const [color, height] = await Promise.all(['rose-carpet-color', 'rose-carpet-height'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp`)));
+  const [color, height] = await Promise.all(['rose-carpet-color', 'rose-carpet-height'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=aubusson-2`)));
   color.colorSpace = THREE.SRGBColorSpace;
   color.anisotropy = height.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const group = new THREE.Group();
