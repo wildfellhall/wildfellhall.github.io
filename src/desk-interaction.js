@@ -14,7 +14,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
     // same picking area without testing every small carved leaf on each move.
     if (object.isMesh && object.name !== 'ivory-relief') pickMeshes.push(object);
   });
-  let zoom = 1, gesture = null, enabled = false;
+  let zoom = 1, gesture = null, enabled = false, focusedDrawer = null;
   const MIN_ZOOM = 1, MAX_ZOOM = 2.8;
   const size = () => canvas.getBoundingClientRect();
   const visible = () => new THREE.Vector2((camera.right - camera.left) / camera.zoom, (camera.top - camera.bottom) / camera.zoom);
@@ -69,12 +69,9 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
   buttons.forEach((button, index) => {
     button.addEventListener('click', () => toggleDrawer(index));
     button.addEventListener('focus', () => {
-      const point = anchorFor(index).project(camera);
-      // A keyboard user can reach a drawer outside a cropped phone view.
-      const view = visible();
-      if (Math.abs(point.x) > .85) pan.x += point.x * view.x / 2;
-      if (Math.abs(point.y) > .80) pan.y += point.y * view.y / 2;
-      clampPan(); invalidate();
+      // Resolve this against the next frame's zoom and pan, since preceding
+      // keyboard events may have changed them before the camera was rendered.
+      focusedDrawer = index; invalidate();
     });
   });
   zoomIn.addEventListener('click', () => setZoom(zoom * 1.25));
@@ -157,8 +154,15 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
     },
     applyCamera(target, direction, detail) {
       camera.zoom = zoom * (1 + detail * .14); clampPan();
+      const up = new THREE.Vector3(0, direction.z, -direction.y);
+      if (focusedDrawer !== null) {
+        const relative = anchorFor(focusedDrawer).sub(target), view = visible();
+        if (Math.abs(relative.x - pan.x) > view.x * .425) pan.x = relative.x;
+        if (Math.abs(relative.dot(up) - pan.y) > view.y * .40) pan.y = relative.dot(up);
+        focusedDrawer = null; clampPan();
+      }
       target.x += pan.x;
-      target.addScaledVector(new THREE.Vector3(0, direction.z, -direction.y), pan.y);
+      target.addScaledVector(up, pan.y);
       room.classList.toggle('is-pannable', limits().lengthSq() > .01);
     },
     animateDrawers(delta, reducedMotion) {

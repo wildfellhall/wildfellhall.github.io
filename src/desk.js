@@ -11,17 +11,22 @@ export async function createDesk(renderer) {
   const writingSurface = new THREE.Group(); writingSurface.position.y = DESK.surfaceY;
   writingSurface.name = 'writing-surface-objects'; group.add(writingSurface);
   const loader = new THREE.TextureLoader();
-  const [colorMap, bumpMap, roughnessMap] = await Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=grain-2`)));
+  const [[colorMap, bumpMap, roughnessMap], [drawerColor, drawerHeight, drawerRoughness]] = await Promise.all([
+    Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=grain-2`))),
+    Promise.all(['color', 'height', 'roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/drawer-ivory-${name}.webp?v=paint-1`))),
+  ]);
   colorMap.colorSpace = THREE.SRGBColorSpace;
-  for (const t of [colorMap, bumpMap, roughnessMap]) t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  drawerColor.colorSpace = THREE.SRGBColorSpace;
+  for (const t of [colorMap, bumpMap, roughnessMap, drawerColor, drawerHeight, drawerRoughness]) t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  for (const t of [drawerColor, drawerHeight, drawerRoughness]) t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
   const paint = new THREE.MeshStandardMaterial({ color: '#e6e0d2', roughness: .68, bumpMap, bumpScale: .018 });
   const edge = new THREE.MeshStandardMaterial({ color: '#d6cdbb', roughness: .60 });
   const polishedEdge = new THREE.MeshStandardMaterial({ color: '#e7e0d1', roughness: .48, bumpMap, bumpScale: .006 });
   const recess = new THREE.MeshStandardMaterial({ color: '#a79b86', roughness: .88 });
   const panel = new THREE.MeshStandardMaterial({ color: '#dbd4c5', roughness: .72, bumpMap, bumpScale: .025 });
   const wood = new THREE.MeshStandardMaterial({ map: colorMap, bumpMap, bumpScale: .045, roughnessMap, roughness: .84, color: '#f8f5ed' });
-  const drawerWood = new THREE.MeshStandardMaterial({ map: colorMap, color: '#c8ac85', bumpMap, bumpScale: .022, roughness: .83 });
-  const endGrain = new THREE.MeshStandardMaterial({ color: '#a88c67', bumpMap, bumpScale: .015, roughness: .86 });
+  const drawerWood = new THREE.MeshStandardMaterial({ map: drawerColor, color: '#ffffff', bumpMap: drawerHeight, bumpScale: .025, roughnessMap: drawerRoughness, roughness: .90 });
+  const endGrain = new THREE.MeshStandardMaterial({ color: '#e4e1d9', bumpMap: drawerHeight, bumpScale: .009, roughness: .84 });
   const brass = new THREE.MeshStandardMaterial({ color: '#9c7844', metalness: .84, roughness: .39 });
   const bronze = new THREE.MeshStandardMaterial({ color: '#655239', metalness: .73, roughness: .58 });
   const porcelain = new THREE.MeshPhysicalMaterial({ color: '#e9e2d4', roughness: .24, clearcoat: .55, clearcoatRoughness: .27 });
@@ -31,6 +36,21 @@ export async function createDesk(renderer) {
   }
   function block(w, h, d, x, y, z, material = paint, radius = .04, parent = group) {
     return mesh(new RoundedBoxGeometry(w, h, d, 3, radius), material, x, y, z, parent);
+  }
+  function drawerBoard(w, h, d, x, y, z, grainAxis, offset, parent, radius = .009) {
+    const geometry = new RoundedBoxGeometry(w, h, d, 3, radius);
+    const positions = geometry.attributes.position, normals = geometry.attributes.normal, uv = geometry.attributes.uv;
+    const point = new THREE.Vector3(), normal = new THREE.Vector3();
+    for (let i = 0; i < positions.count; i++) {
+      point.fromBufferAttribute(positions, i); normal.fromBufferAttribute(normals, i);
+      const face = ['x', 'y', 'z'].reduce((a, b) => Math.abs(normal[a]) > Math.abs(normal[b]) ? a : b);
+      const along = face === grainAxis ? (grainAxis === 'x' ? 'z' : 'x') : grainAxis;
+      const across = ['x', 'y', 'z'].find(axis => axis !== face && axis !== along);
+      // Physical scale instead of stretching a whole desktop texture onto
+      // each narrow wall. Side grain follows the length of the drawer.
+      uv.setXY(i, point[along] / 6.4 + offset[0], point[across] / 6.4 + offset[1]);
+    }
+    return mesh(geometry, drawerWood, x, y, z, parent);
   }
   function top(w, d, y, thickness, bevel, material) {
     const g = new THREE.ExtrudeGeometry(desktopOutline(w, d), {
@@ -71,18 +91,21 @@ export async function createDesk(renderer) {
     moving.userData.drawerIndex = index; group.add(moving);
     return { ...spec, group: moving, open: false, travel: 2.65 };
   });
-  for (const { x, w, group: moving } of drawers) {
+  for (const [index, { x, w, group: moving }] of drawers.entries()) {
     block(w, 1.13, .15, x, -.96, 3.29, paint, .055, moving).name = 'drawer-front';
     block(w - .19, .94, .055, x, -.96, 3.385, edge, .07, moving);
     block(w - .28, .84, .058, x, -.96, 3.423, paint, .065, moving);
     block(w - .39, .73, .018, x, -.96, 3.458, panel, .065, moving);
-    // An inset bottom, exposed side grain and rear wall enclose an empty tray.
-    block(w - .32, .10, 5.82, x, -1.41, .24, drawerWood, .012, moving);
-    block(w - .32, .86, .14, x, -.98, -2.60, drawerWood, .015, moving);
-    block(w - .32, .86, .10, x, -.98, 3.17, drawerWood, .012, moving);
+    // Three fitted bottom boards and painted side walls enclose an empty tray.
+    // Fine bevels catch the light at the joints; all timber remains ivory white.
+    for (let board = 0; board < 3; board++) {
+      drawerBoard(w - .32, .10, 1.938, x, -1.41, -1.70 + board * 1.94, 'x', [.23 + index * .29, .17 + board * .31 + index * .11], moving, .004);
+    }
+    drawerBoard(w - .32, .86, .14, x, -.98, -2.60, 'x', [.35 + index * .21, .29], moving);
+    drawerBoard(w - .32, .86, .10, x, -.98, 3.17, 'x', [.18 + index * .17, .73], moving);
     for (const side of [-1, 1]) {
       const wallX = x + side * (w / 2 - .24);
-      block(.16, .86, 5.82, wallX, -.98, .24, drawerWood, .012, moving);
+      drawerBoard(.16, .86, 5.82, wallX, -.98, .24, 'z', [.41 + index * .13, .37 + side * .19], moving);
       block(.20, .08, 5.95, wallX, -1.50, .10, recess, .01);
       // Shallow dovetail ends in the drawer sides, cut into their outer face.
       for (let i = 0; i < 3; i++) {
