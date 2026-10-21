@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createCarvings, createEmbossing } from './ornaments.js';
-import { desktopOutline, legProfile, sweptMolding } from './furniture-profiles.js';
+import { desktopOutline, legProfile, sweptMolding, smoothPeriodicNormals } from './furniture-profiles.js';
+import { drawerTray } from './drawer-tray.js';
+import { continuousWood, applyWoodCoordinates } from './wood-finish.js';
 
 export const DESK = Object.freeze({ width: 15.2, depth: 7.6, surfaceY: .203, floorY: -6.08 });
 
@@ -12,21 +14,22 @@ export async function createDesk(renderer) {
   writingSurface.name = 'writing-surface-objects'; group.add(writingSurface);
   const loader = new THREE.TextureLoader();
   const [[colorMap, bumpMap, roughnessMap], [drawerColor, drawerHeight, drawerRoughness]] = await Promise.all([
-    Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=grain-2`))),
+    Promise.all(['ivory-color', 'ivory-height', 'ivory-roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/${name}.webp?v=grain-3`))),
     Promise.all(['color', 'height', 'roughness'].map(name => loader.loadAsync(`${import.meta.env.BASE_URL}materials/drawer-ivory-${name}.webp?v=paint-1`))),
   ]);
   colorMap.colorSpace = THREE.SRGBColorSpace;
   drawerColor.colorSpace = THREE.SRGBColorSpace;
   for (const t of [colorMap, bumpMap, roughnessMap, drawerColor, drawerHeight, drawerRoughness]) t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
-  for (const t of [drawerColor, drawerHeight, drawerRoughness]) t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
-  const paint = new THREE.MeshStandardMaterial({ color: '#e6e0d2', roughness: .68, bumpMap, bumpScale: .018 });
-  const edge = new THREE.MeshStandardMaterial({ color: '#d6cdbb', roughness: .60 });
-  const polishedEdge = new THREE.MeshStandardMaterial({ color: '#e7e0d1', roughness: .48, bumpMap, bumpScale: .006 });
+  for (const t of [colorMap, bumpMap, roughnessMap, drawerColor, drawerHeight, drawerRoughness]) t.wrapS = t.wrapT = THREE.MirroredRepeatWrapping;
+  const painted = (color, roughness, bumpScale) => continuousWood(new THREE.MeshStandardMaterial({ color, map: colorMap, roughnessMap, roughness, bumpMap, bumpScale }), 18);
+  const paint = painted('#fffdf8', .86, .020);
+  const edge = painted('#f1ebdf', .82, .014);
+  const polishedEdge = painted('#fffdf8', .69, .012);
   const recess = new THREE.MeshStandardMaterial({ color: '#a79b86', roughness: .88 });
-  const panel = new THREE.MeshStandardMaterial({ color: '#dbd4c5', roughness: .72, bumpMap, bumpScale: .025 });
-  const wood = new THREE.MeshStandardMaterial({ map: colorMap, bumpMap, bumpScale: .045, roughnessMap, roughness: .84, color: '#f8f5ed' });
-  const drawerWood = new THREE.MeshStandardMaterial({ map: drawerColor, color: '#ffffff', bumpMap: drawerHeight, bumpScale: .025, roughnessMap: drawerRoughness, roughness: .90 });
-  const endGrain = new THREE.MeshStandardMaterial({ color: '#e4e1d9', bumpMap: drawerHeight, bumpScale: .009, roughness: .84 });
+  const panel = painted('#fffdf8', .89, .022);
+  const wood = painted('#fffdf8', .84, .030);
+  const drawerWood = continuousWood(new THREE.MeshStandardMaterial({ map: drawerColor, color: '#ffffff', bumpMap: drawerHeight, bumpScale: .025, roughnessMap: drawerRoughness, roughness: .90 }));
+  drawerWood.userData.localWood = true;
   const brass = new THREE.MeshStandardMaterial({ color: '#9c7844', metalness: .84, roughness: .39 });
   const bronze = new THREE.MeshStandardMaterial({ color: '#655239', metalness: .73, roughness: .58 });
   const porcelain = new THREE.MeshPhysicalMaterial({ color: '#e9e2d4', roughness: .24, clearcoat: .55, clearcoatRoughness: .27 });
@@ -36,21 +39,6 @@ export async function createDesk(renderer) {
   }
   function block(w, h, d, x, y, z, material = paint, radius = .04, parent = group) {
     return mesh(new RoundedBoxGeometry(w, h, d, 3, radius), material, x, y, z, parent);
-  }
-  function drawerBoard(w, h, d, x, y, z, grainAxis, offset, parent, radius = .009) {
-    const geometry = new RoundedBoxGeometry(w, h, d, 3, radius);
-    const positions = geometry.attributes.position, normals = geometry.attributes.normal, uv = geometry.attributes.uv;
-    const point = new THREE.Vector3(), normal = new THREE.Vector3();
-    for (let i = 0; i < positions.count; i++) {
-      point.fromBufferAttribute(positions, i); normal.fromBufferAttribute(normals, i);
-      const face = ['x', 'y', 'z'].reduce((a, b) => Math.abs(normal[a]) > Math.abs(normal[b]) ? a : b);
-      const along = face === grainAxis ? (grainAxis === 'x' ? 'z' : 'x') : grainAxis;
-      const across = ['x', 'y', 'z'].find(axis => axis !== face && axis !== along);
-      // Physical scale instead of stretching a whole desktop texture onto
-      // each narrow wall. Side grain follows the length of the drawer.
-      uv.setXY(i, point[along] / 6.4 + offset[0], point[across] / 6.4 + offset[1]);
-    }
-    return mesh(geometry, drawerWood, x, y, z, parent);
   }
   function top(w, d, y, thickness, bevel, material) {
     const g = new THREE.ExtrudeGeometry(desktopOutline(w, d), {
@@ -91,31 +79,15 @@ export async function createDesk(renderer) {
     moving.userData.drawerIndex = index; group.add(moving);
     return { ...spec, group: moving, open: false, travel: 2.65 };
   });
-  for (const [index, { x, w, group: moving }] of drawers.entries()) {
+  for (const { x, w, group: moving } of drawers) {
     block(w, 1.13, .15, x, -.96, 3.29, paint, .055, moving).name = 'drawer-front';
     block(w - .19, .94, .055, x, -.96, 3.385, edge, .07, moving);
     block(w - .28, .84, .058, x, -.96, 3.423, paint, .065, moving);
     block(w - .39, .73, .018, x, -.96, 3.458, panel, .065, moving);
-    // Three fitted bottom boards and painted side walls enclose an empty tray.
-    // Fine bevels catch the light at the joints; all timber remains ivory white.
-    for (let board = 0; board < 3; board++) {
-      drawerBoard(w - .32, .10, 1.938, x, -1.41, -1.70 + board * 1.94, 'x', [.23 + index * .29, .17 + board * .31 + index * .11], moving, .004);
-    }
-    drawerBoard(w - .32, .86, .14, x, -.98, -2.60, 'x', [.35 + index * .21, .29], moving);
-    drawerBoard(w - .32, .86, .10, x, -.98, 3.17, 'x', [.18 + index * .17, .73], moving);
+    mesh(drawerTray(w - .32), drawerWood, x, 0, .28, moving).name = 'continuous-ivory-drawer-interior';
     for (const side of [-1, 1]) {
       const wallX = x + side * (w / 2 - .24);
-      drawerBoard(.16, .86, 5.82, wallX, -.98, .24, 'z', [.41 + index * .13, .37 + side * .19], moving);
       block(.20, .08, 5.95, wallX, -1.50, .10, recess, .01);
-      // Shallow dovetail ends in the drawer sides, cut into their outer face.
-      for (let i = 0; i < 3; i++) {
-        const joint = new THREE.Shape();
-        joint.moveTo(-.10, -.075); joint.lineTo(.10, -.105);
-        joint.lineTo(.10, .105); joint.lineTo(-.10, .075); joint.closePath();
-        const geometry = new THREE.ExtrudeGeometry(joint, { depth: .006, bevelEnabled: false });
-        geometry.rotateY(side * Math.PI / 2);
-        mesh(geometry, endGrain, wallX + side * .079, -1.23 + i * .26, 3.04, moving);
-      }
     }
   }
   for (const x of [-7.16, -2.43, 2.43, 7.16]) {
@@ -148,11 +120,7 @@ export async function createDesk(renderer) {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
     const profile = legProfile(sx, sz);
     const g = taperedLeg(profile);
-    mesh(g, paint);
-    const foot = mesh(new THREE.SphereGeometry(1, 24, 16), paint, sx * 6.90, -5.83, sz * 3.04);
-    foot.scale.set(.30, .16, .38);
-    const sole = mesh(new THREE.SphereGeometry(1, 24, 12), edge, sx * 6.91, -5.96, sz * 3.06);
-    sole.scale.set(.29, .035, .36);
+    mesh(g, paint).name = 'continuous-cabriole-leg-and-scroll-foot';
   }
 
   // Ivory porcelain cabinet knobs seated in chased brass rosettes.
@@ -181,29 +149,40 @@ export async function createDesk(renderer) {
   mesh(new THREE.CircleGeometry(.025, 16), bronze, 0, -1.27, 3.522, centre);
   block(.025, .065, .006, 0, -1.31, 3.524, bronze, .004, centre);
   group.add(createCarvings(paint, edge, recess, drawers.map(drawer => drawer.group)), await createEmbossing(DESK.surfaceY));
+  applyWoodCoordinates(group);
   return { group, writingSurface, drawers };
 }
 
-function taperedLeg({ curve, radius }) {
-  const lengthSegments = 100, radialSegments = 40;
-  const frames = curve.computeFrenetFrames(lengthSegments, false), positions = [], uv = [], indices = [];
+function taperedLeg({ surface }) {
+  const lengthSegments = 192, radialSegments = 64;
+  const positions = [], uv = [], indices = [], point = new THREE.Vector3();
   for (let i = 0; i <= lengthSegments; i++) {
-    const t = i / lengthSegments, p = curve.getPointAt(t), r = radius(t);
+    const t = i / lengthSegments;
     for (let j = 0; j <= radialSegments; j++) {
       const theta = j / radialSegments * Math.PI * 2;
-      const offset = frames.normals[i].clone().multiplyScalar(Math.cos(theta) * r).addScaledVector(frames.binormals[i], Math.sin(theta) * r);
-      // Seat the top of the leg within the lower rail, clear of the tray above.
-      positions.push(p.x + offset.x, Math.min(p.y + offset.y, -1.57), p.z + offset.z); uv.push(j / radialSegments, t);
+      surface(t, theta, point);
+      positions.push(point.x, point.y, point.z); uv.push(j / radialSegments, t);
       if (i < lengthSegments && j < radialSegments) {
         const a = i * (radialSegments + 1) + j, b = a + radialSegments + 1;
-        indices.push(a, a + 1, b, b, a + 1, b + 1);
+        indices.push(a, b, a + 1, b, b + 1, a + 1);
       }
     }
+  }
+  // Close the timber at the apron and underneath the foot. The foot grows
+  // from the same surface as the ankle instead of intersecting a separate ball.
+  for (const [row, sign] of [[0, 1], [lengthSegments, -1]]) {
+    const start = row * (radialSegments + 1), center = positions.length / 3;
+    const p = new THREE.Vector3();
+    for (let j = 0; j < radialSegments; j++) p.add(new THREE.Vector3().fromArray(positions, (start + j) * 3));
+    p.divideScalar(radialSegments); positions.push(p.x, p.y, p.z); uv.push(.5, .5);
+    for (let j = 0; j < radialSegments; j++) indices.push(...(sign > 0 ? [center, start + j, start + j + 1] : [center, start + j + 1, start + j]));
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geometry.setIndex(indices); geometry.computeVertexNormals(); return geometry;
+  geometry.setIndex(indices); geometry.computeVertexNormals();
+  smoothPeriodicNormals(geometry, lengthSegments + 1, radialSegments + 1);
+  return geometry;
 }
 
 export function createEnvironment(renderer, scene) {

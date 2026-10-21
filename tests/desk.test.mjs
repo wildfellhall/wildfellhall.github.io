@@ -121,6 +121,7 @@ test('desk renders, atmosphere and close view work, and keyboard controls remain
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto(baseURL);
   await page.locator('#room.is-ready').waitFor();
   assert.equal((await page.locator('.desk-controls').innerText()).trim(), '', 'Controls must not add visible text over the desk');
@@ -205,7 +206,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=interactive-4$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=continuous-5$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   assert.equal(await page.locator('#desk').evaluate(canvas => getComputedStyle(canvas).pointerEvents), 'none', 'The inactive canvas must not intercept fallback touch gestures');
@@ -214,7 +215,7 @@ test('browsers without WebGL show the matching still desk', async () => {
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=interactive-4$/);
+  }), /desk-still-wide\.webp\?v=continuous-5$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });

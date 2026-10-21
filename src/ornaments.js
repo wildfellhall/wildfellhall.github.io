@@ -101,8 +101,21 @@ export function createCarvings(paint, edgePaint, patina, drawerGroups) {
     parts[material].push(g);
   }
   function stroke(points, radius = .035, material = 0) {
-    const curve = new THREE.CubicBezierCurve3(...points.map(([x, y, z = .035]) => new THREE.Vector3(x, y, z)));
-    add(new THREE.TubeGeometry(curve, 28, radius, 8, false), material);
+    const curve = new THREE.CubicBezierCurve3(...points.map(([x, y, z = radius * .50]) => new THREE.Vector3(x, y, z)));
+    const geometry = new THREE.TubeGeometry(curve, 40, radius, 12, false), positions = geometry.attributes.position;
+    // Ease the end of each stem into its backing instead of leaving an open,
+    // blunt tube end above the timber.
+    for (let row = 0; row <= 40; row++) {
+      const t = row / 40, center = curve.getPointAt(t);
+      const taper = .18 + .82 * THREE.MathUtils.smoothstep(t, 0, .08) * THREE.MathUtils.smoothstep(1 - t, 0, .08);
+      for (let column = 0; column <= 12; column++) {
+        const i = row * 13 + column;
+        positions.setXYZ(i, center.x + (positions.getX(i) - center.x) * taper, center.y + (positions.getY(i) - center.y) * taper,
+          center.z + (positions.getZ(i) - center.z) * taper - radius * (1 - taper));
+      }
+    }
+    geometry.computeVertexNormals();
+    add(geometry, material);
     return curve;
   }
   function leaf(x, y, angle, length = .55, width = .22, relief = .075) {
@@ -118,8 +131,9 @@ export function createCarvings(paint, edgePaint, patina, drawerGroups) {
         let channels = 0;
         for (const fork of [.20, .39, .58, .74]) channels += Math.exp(-Math.pow((t - fork - Math.abs(s) * .15) / .024, 2));
         const veinDepth = Math.min(.014, relief * .18) * channels * Math.sin(Math.PI * Math.abs(s)) * envelope;
+        const shoulder = Math.pow(Math.max(0, 1 - s * s), 1.7);
         vertices.push(t * length, s * width * envelope * lobes,
-          .005 + relief * envelope * Math.pow(Math.max(0, 1 - s * s), 1.2) + relief * .15 * Math.sin(t * Math.PI * 2) + relief * .22 * Math.pow(t, 8) - veinDepth);
+          -.004 + shoulder * (relief * envelope + relief * .15 * Math.sin(t * Math.PI * 2) * envelope + relief * .22 * Math.pow(t, 8) * envelope) - veinDepth * shoulder);
         uv.push(t, j / columns);
         if (i < rows && j < columns) {
           const a = i * (columns + 1) + j, b = a + columns + 1;
@@ -143,8 +157,12 @@ export function createCarvings(paint, edgePaint, patina, drawerGroups) {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(indices); g.computeVertexNormals();
     add(g, 0, at(x, y, 0, angle));
-    const ridge = new THREE.CubicBezierCurve3(new THREE.Vector3(.005, 0, .008), new THREE.Vector3(length * .26, 0, relief + .008), new THREE.Vector3(length * .68, 0, relief + .005), new THREE.Vector3(length * .98, 0, relief * .23 + .008));
-    add(new THREE.TubeGeometry(ridge, 20, Math.min(.007, width * .065), 5, false), 0, at(x, y, 0, angle));
+    const veinRadius = Math.min(.006, width * .055);
+    const ridge = new THREE.CatmullRomCurve3(Array.from({ length: 25 }, (_, i) => {
+      const t = i / 24, e = Math.pow(Math.sin(Math.PI * t), .78);
+      return new THREE.Vector3(t * length, 0, -.004 + relief * e * (1 + .15 * Math.sin(t * Math.PI * 2) + .22 * Math.pow(t, 8)) - veinRadius * .45);
+    }));
+    add(new THREE.TubeGeometry(ridge, 32, veinRadius, 7, false), 0, at(x, y, 0, angle));
   }
   function foliate(points, count = 6, size = .43) {
     const curve = stroke(points, .044, 1);
@@ -277,7 +295,7 @@ export function createCarvings(paint, edgePaint, patina, drawerGroups) {
     const { p, tangent, outward } = perimeterFrame(edge, i / beads);
     frame.makeBasis(new THREE.Vector3(-tangent.x, 0, -tangent.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(outward.x, 0, outward.y)).setPosition(p.x + outward.x * .010, -.25, p.y + outward.y * .010);
     const scale = i % 3 ? new THREE.Vector3(.042, .033, .026) : new THREE.Vector3(.018, .041, .024);
-    add(new THREE.SphereGeometry(1, 10, 8), 0, new THREE.Matrix4().makeScale(scale));
+    add(new THREE.SphereGeometry(1, 10, 8), 0, new THREE.Matrix4().makeScale(scale.x, scale.y, scale.z));
   }
   finishBatch(root);
   return root;
