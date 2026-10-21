@@ -2,22 +2,9 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createCarvings, createEmbossing } from './ornaments.js';
+import { desktopOutline, legProfile, sweptMolding } from './furniture-profiles.js';
 
 export const DESK = Object.freeze({ width: 15.2, depth: 7.6, surfaceY: .203, floorY: -6.08 });
-
-// A shaped, softly serpentine outline for the layered solid-wood top.
-function topOutline(w, d) {
-  const x = w / 2, z = d / 2, r = .30;
-  const s = new THREE.Shape();
-  s.moveTo(-x + r, -z);
-  s.lineTo(x - r, -z); s.quadraticCurveTo(x, -z, x, -z + r);
-  s.lineTo(x, z - r); s.quadraticCurveTo(x, z, x - r, z);
-  s.bezierCurveTo(x * .65, z - .25, x * .35, z - .22, 0, z - .06);
-  s.bezierCurveTo(-x * .35, z - .22, -x * .65, z - .25, -x + r, z);
-  s.quadraticCurveTo(-x, z, -x, z - r); s.lineTo(-x, -z + r);
-  s.quadraticCurveTo(-x, -z, -x + r, -z);
-  return s;
-}
 
 export async function createDesk(renderer) {
   const group = new THREE.Group(); group.name = 'carved-antique-ivory-writing-desk';
@@ -29,6 +16,7 @@ export async function createDesk(renderer) {
   for (const t of [colorMap, bumpMap, roughnessMap]) t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   const paint = new THREE.MeshStandardMaterial({ color: '#e6e0d2', roughness: .68, bumpMap, bumpScale: .018 });
   const edge = new THREE.MeshStandardMaterial({ color: '#d6cdbb', roughness: .60 });
+  const polishedEdge = new THREE.MeshStandardMaterial({ color: '#e7e0d1', roughness: .48, bumpMap, bumpScale: .006 });
   const recess = new THREE.MeshStandardMaterial({ color: '#a79b86', roughness: .88 });
   const panel = new THREE.MeshStandardMaterial({ color: '#dbd4c5', roughness: .72, bumpMap, bumpScale: .025 });
   const wood = new THREE.MeshStandardMaterial({ map: colorMap, bumpMap, bumpScale: .045, roughnessMap, roughness: .84, color: '#f8f5ed' });
@@ -43,7 +31,7 @@ export async function createDesk(renderer) {
     return mesh(new RoundedBoxGeometry(w, h, d, 3, radius), material, x, y, z);
   }
   function top(w, d, y, thickness, bevel, material) {
-    const g = new THREE.ExtrudeGeometry(topOutline(w, d), {
+    const g = new THREE.ExtrudeGeometry(desktopOutline(w, d), {
       depth: thickness, bevelEnabled: true, bevelSize: bevel, bevelThickness: bevel, bevelSegments: 3, curveSegments: 32,
       UVGenerator: {
         generateTopUV(geometry, vertices, a, b, c) {
@@ -57,9 +45,16 @@ export async function createDesk(renderer) {
     g.rotateX(Math.PI / 2);
     return mesh(g, material, 0, y, 0);
   }
-  top(14.90, 7.30, -.27, .10, .035, edge);
-  top(15.16, 7.57, -.15, .10, .045, paint);
-  top(15.28, 7.67, -.015, .11, .055, edge);
+  top(14.90, 7.30, -.27, .10, .025, edge);
+  // An ovolo lip, concave cove, projecting bead and recessed lower fillet.
+  // Real profile changes produce the highlight/shadow lines around the edge.
+  mesh(sweptMolding(desktopOutline(15.18, 7.57), [
+    [-.018, .177], [.010, .168], [.031, .145], [.040, .115], [.035, .085],
+    [.017, .055], [-.014, .032], [-.031, .008], [-.036, -.018], [-.026, -.044],
+    [-.002, -.063], [.034, -.080], [.054, -.104], [.058, -.132], [.047, -.157],
+    [.022, -.177], [-.014, -.188], [-.049, -.190, 1], [-.055, -.206, 1], [-.055, -.295, 1],
+    [-.068, -.313], [-.100, -.326], [-.136, -.330], [-.145, -.350],
+  ]), [polishedEdge, edge]).name = 'ogee-and-ovolo-edge-molding';
   top(15.18, 7.57, .175, .15, .028, [wood, paint]);
 
   // A deeper frieze and separate fronts make the drawer joints legible.
@@ -101,9 +96,8 @@ export async function createDesk(renderer) {
 
   // Continuous cabriole legs: swollen knees, swept ankles and small scroll feet.
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    const points = [[0, -1.35, 0], [.20, -2.08, .17], [.28, -2.75, .24], [.07, -3.65, .07], [-.08, -4.63, -.05], [.06, -5.42, .08], [.30, -5.79, .25]];
-    const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(sx * (6.57 + x), y, sz * (2.77 + z))));
-    const g = taperedLeg(curve, [.31, .40, .28, .17, .115, .14, .21]);
+    const profile = legProfile(sx, sz);
+    const g = taperedLeg(profile);
     mesh(g, paint);
     const foot = mesh(new THREE.SphereGeometry(1, 24, 16), paint, sx * 6.90, -5.83, sz * 3.04);
     foot.scale.set(.30, .16, .38);
@@ -135,12 +129,11 @@ export async function createDesk(renderer) {
   return { group, writingSurface };
 }
 
-function taperedLeg(curve, radii) {
-  const lengthSegments = 72, radialSegments = 20;
+function taperedLeg({ curve, radius }) {
+  const lengthSegments = 100, radialSegments = 40;
   const frames = curve.computeFrenetFrames(lengthSegments, false), positions = [], uv = [], indices = [];
   for (let i = 0; i <= lengthSegments; i++) {
-    const t = i / lengthSegments, p = curve.getPointAt(t), f = t * (radii.length - 1), a = Math.min(radii.length - 2, Math.floor(f));
-    const u = THREE.MathUtils.smoothstep(f - a, 0, 1), r = THREE.MathUtils.lerp(radii[a], radii[a + 1], u);
+    const t = i / lengthSegments, p = curve.getPointAt(t), r = radius(t);
     for (let j = 0; j <= radialSegments; j++) {
       const theta = j / radialSegments * Math.PI * 2;
       const offset = frames.normals[i].clone().multiplyScalar(Math.cos(theta) * r).addScaledVector(frames.binormals[i], Math.sin(theta) * r);

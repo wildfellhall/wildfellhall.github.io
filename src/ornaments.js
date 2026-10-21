@@ -1,25 +1,57 @@
 import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { desktopOutline, perimeterFrame, legProfile } from './furniture-profiles.js';
+
+function giltFinish() {
+  const w = 512, h = 128, colour = new Uint8Array(w * h * 4), roughness = new Uint8Array(w * h * 4), relief = new Uint8Array(w * h * 4);
+  let seed = 1848;
+  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const i = (y * w + x) * 4, n = random() - .5;
+    const burnish = Math.sin(x * .13 + Math.sin(y * .09)) * 2 + Math.sin(y * .3) * 1.6;
+    const join = x % 93 === 0 ? 5 : 0;
+    colour.set([204 + n * 9 + burnish - join, 163 + n * 8 + burnish - join, 83 + n * 6 + burnish - join, 255], i);
+    roughness.set([130 + n * 30 + join, 130 + n * 30 + join, 130 + n * 30 + join, 255], i);
+    relief.set([128 + n * 22 + burnish, 128 + n * 22 + burnish, 128 + n * 22 + burnish, 255], i);
+  }
+  const textures = [colour, roughness, relief].map(data => {
+    const texture = new THREE.DataTexture(data, w, h);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = true; texture.needsUpdate = true;
+    return texture;
+  });
+  textures[0].colorSpace = THREE.SRGBColorSpace;
+  return textures;
+}
 
 export async function createEmbossing(surfaceY) {
   const svg = await new SVGLoader().loadAsync(`${import.meta.env.BASE_URL}ornaments/wildfell-hall.svg`);
   const geometry = new THREE.ExtrudeGeometry(svg.paths.flatMap(path => SVGLoader.createShapes(path)), {
-    depth: .65, bevelEnabled: true, bevelThickness: .35, bevelSize: .38, bevelSegments: 3, curveSegments: 12,
+    depth: 1.7, bevelEnabled: true, bevelThickness: .65, bevelSize: .62, bevelSegments: 5, curveSegments: 24,
   });
   geometry.computeBoundingBox();
   const box = geometry.boundingBox, center = box.getCenter(new THREE.Vector3());
-  const scale = 3.05 / (box.max.x - box.min.x);
+  const scale = 3.25 / (box.max.x - box.min.x);
   geometry.translate(-center.x, -center.y, 0);
   geometry.scale(scale, -scale, scale);
   reverseWinding(geometry);
   geometry.rotateX(-Math.PI / 2);
   geometry.computeVertexNormals();
-  const lettering = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
-    color: '#967343', metalness: .78, roughness: .48, envMapIntensity: .8,
-  }));
-  lettering.position.set(0, surfaceY + .001, -2.52);
-  lettering.name = 'shallow-gilt-lettering';
+  geometry.computeBoundingBox();
+  const extents = geometry.boundingBox, positions = geometry.attributes.position, uv = geometry.attributes.uv;
+  for (let i = 0; i < positions.count; i++) uv.setXY(i,
+    (positions.getX(i) - extents.min.x) / (extents.max.x - extents.min.x),
+    (positions.getZ(i) - extents.min.z) / (extents.max.z - extents.min.z));
+  const [map, roughnessMap, bumpMap] = giltFinish();
+  const face = new THREE.MeshStandardMaterial({ map, roughnessMap, bumpMap, bumpScale: .0006, metalness: .92, roughness: .72, envMapIntensity: 1.15 });
+  const bevel = new THREE.MeshStandardMaterial({ color: '#a77d3c', metalness: .9, roughness: .32, envMapIntensity: 1.05 });
+  const lettering = new THREE.Mesh(geometry, [face, bevel]);
+  // The lower bevel beds into the timber; only the thin gilded crown rises
+  // above the surface. No duplicate outline or floating backing plate.
+  lettering.position.set(0, surfaceY + .0004, -2.52);
+  lettering.name = 'burnished-gold-script-with-beveled-edges';
   lettering.castShadow = lettering.receiveShadow = true;
   return lettering;
 }
@@ -38,39 +70,47 @@ export function createCarvings(paint, edgePaint, patina) {
   const root = new THREE.Group();
   root.name = 'hand-carved-flowers-acanthus-and-shells';
   const parts = [[], [], []], finishes = [paint, edgePaint, patina];
-  let frame = new THREE.Matrix4();
+  let frame = new THREE.Matrix4(), wrap = null;
   const at = (x, y, z = 0, angle = 0) => new THREE.Matrix4().compose(
     new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), angle), new THREE.Vector3(1, 1, 1));
   function add(geometry, material = 0, transform = new THREE.Matrix4()) {
-    const g = geometry.index ? geometry.toNonIndexed() : geometry;
-    if (g !== geometry) geometry.dispose();
+    let g = geometry;
     const matrix = frame.clone().multiply(transform);
     g.applyMatrix4(matrix);
+    if (wrap) {
+      const positions = g.attributes.position, p = new THREE.Vector3();
+      for (let i = 0; i < positions.count; i++) {
+        wrap(positions.getX(i), positions.getY(i), positions.getZ(i), p);
+        positions.setXYZ(i, p.x, p.y, p.z);
+      }
+      g.computeVertexNormals();
+    }
+    if (g.index) { const flat = g.toNonIndexed(); g.dispose(); g = flat; }
     if (matrix.determinant() < 0) reverseWinding(g);
     // All merged pieces have the same attributes.
     if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
     parts[material].push(g);
   }
   function stroke(points, radius = .035, material = 0) {
-    const curve = new THREE.CubicBezierCurve3(...points.map(([x, y, z = .055]) => new THREE.Vector3(x, y, z)));
+    const curve = new THREE.CubicBezierCurve3(...points.map(([x, y, z = .035]) => new THREE.Vector3(x, y, z)));
     add(new THREE.TubeGeometry(curve, 28, radius, 8, false), material);
     return curve;
   }
   function leaf(x, y, angle, length = .55, width = .22, relief = .075) {
-    const vertices = [], uv = [], indices = [], rows = 36, columns = 18;
+    const vertices = [], uv = [], indices = [], rows = length < .3 ? 16 : 36, columns = length < .3 ? 10 : 18;
     for (let i = 0; i <= rows; i++) {
       const t = i / rows;
-      const envelope = Math.pow(Math.sin(Math.PI * t), .85);
-      const lobes = .87 + .13 * Math.cos(t * Math.PI * 7);
+      const envelope = Math.pow(Math.sin(Math.PI * t), .78);
+      const lobes = .76 + .24 * Math.pow(.5 + .5 * Math.cos(t * Math.PI * 10), .7);
       for (let j = 0; j <= columns; j++) {
         const s = j / columns * 2 - 1;
         // Incised branching veins are cut into the leaf surface itself so
         // side lighting catches their rounded shoulders and recessed channels.
         let channels = 0;
         for (const fork of [.20, .39, .58, .74]) channels += Math.exp(-Math.pow((t - fork - Math.abs(s) * .15) / .024, 2));
-        const veinDepth = .014 * channels * Math.sin(Math.PI * Math.abs(s)) * envelope;
+        const veinDepth = Math.min(.014, relief * .18) * channels * Math.sin(Math.PI * Math.abs(s)) * envelope;
         vertices.push(t * length, s * width * envelope * lobes,
-          .018 + relief * envelope * Math.pow(Math.max(0, 1 - s * s), 1.2) + .024 * Math.sin(t * Math.PI * 2) - veinDepth);
+          .005 + relief * envelope * Math.pow(Math.max(0, 1 - s * s), 1.2) + relief * .15 * Math.sin(t * Math.PI * 2) + relief * .22 * Math.pow(t, 8) - veinDepth);
         uv.push(t, j / columns);
         if (i < rows && j < columns) {
           const a = i * (columns + 1) + j, b = a + columns + 1;
@@ -78,13 +118,24 @@ export function createCarvings(paint, edgePaint, patina) {
         }
       }
     }
+    // Close the carved perimeter into the backing timber. Rounded undercuts
+    // now have thickness instead of an infinitely thin floating leaf edge.
+    const boundary = [];
+    for (let i = 0; i <= rows; i++) boundary.push(i * (columns + 1));
+    for (let i = rows; i >= 0; i--) boundary.push(i * (columns + 1) + columns);
+    for (let i = 0; i < boundary.length; i++) {
+      const a = boundary[i], b = boundary[(i + 1) % boundary.length], start = vertices.length / 3;
+      vertices.push(vertices[a * 3], vertices[a * 3 + 1], -.008, vertices[b * 3], vertices[b * 3 + 1], -.008);
+      uv.push(uv[a * 2], uv[a * 2 + 1], uv[b * 2], uv[b * 2 + 1]);
+      indices.push(a, start, b, b, start, start + 1);
+    }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(indices); g.computeVertexNormals();
     add(g, 0, at(x, y, 0, angle));
-    const ridge = new THREE.CubicBezierCurve3(new THREE.Vector3(.015, 0, .037), new THREE.Vector3(length * .26, 0, relief + .035), new THREE.Vector3(length * .68, 0, relief + .018), new THREE.Vector3(length * .98, 0, .026));
-    add(new THREE.TubeGeometry(ridge, 20, .009, 5, false), 1, at(x, y, 0, angle));
+    const ridge = new THREE.CubicBezierCurve3(new THREE.Vector3(.005, 0, .008), new THREE.Vector3(length * .26, 0, relief + .008), new THREE.Vector3(length * .68, 0, relief + .005), new THREE.Vector3(length * .98, 0, relief * .23 + .008));
+    add(new THREE.TubeGeometry(ridge, 20, Math.min(.007, width * .065), 5, false), 0, at(x, y, 0, angle));
   }
   function foliate(points, count = 6, size = .43) {
     const curve = stroke(points, .044, 1);
@@ -116,20 +167,20 @@ export function createCarvings(paint, edgePaint, patina) {
 
   // The largest carving lives on the visible furniture, not in the writing area.
   for (const x of [-4.82, 4.82]) {
-    frame = at(x, -1.02, 3.51);
+    frame = at(x, -1.02, 3.470);
     for (const side of [-1, 1]) {
       foliate([[side * .32, .02], [side * .73, -.38], [side * 1.45, -.22], [side * 1.65, .20]], 4, .42);
       stroke([[side * 1.65, .20], [side * 1.43, .50], [side * 1.03, .15], [side * 1.35, .04]], .03);
       rose(side * 1.72, -.12, .14);
     }
   }
-  frame = at(0, -1.03, 3.56);
+  frame = at(0, -1.03, 3.470);
   rose(0, .12, .22);
   for (const side of [-1, 1]) {
     foliate([[side * .25, .14], [side * .48, .43], [side * .85, .40], [side * 1, .18]], 4, .25);
     foliate([[side * .25, -.25], [side * .8, -.46], [side * 1.45, -.42], [side * 1.85, -.13]], 5, .29);
   }
-  frame = at(0, -1.96, 3.43);
+  frame = at(0, -1.96, 3.367);
   for (const side of [-1, 1]) scroll(side, .02, 2.45);
   // A fan shell with deeply modelled ribs and a curled lower tip.
   for (let i = 0; i < 13; i++) {
@@ -144,16 +195,28 @@ export function createCarvings(paint, edgePaint, patina) {
     rose(0, -.06, .17);
   }
 
-  // Carved knees and cascading acanthus on each cabriole leg.
+  // Knee rosettes, trailing acanthus, fine reeds and ankle buds all follow
+  // the same curved cross-section as the leg, so none hover in front of it.
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-    frame = new THREE.Matrix4().makeTranslation(sx * 6.75, -2.03, sz * 3.48)
-      .multiply(new THREE.Matrix4().makeRotationY(sz > 0 ? sx * .23 : Math.PI - sx * .23));
-    rose(0, .20, .24);
-    leaf(0, .05, -Math.PI / 2, 1.05, .28, .095);
+    wrap = legProfile(sx, sz).wrap;
+    frame.identity();
+    rose(0, -2.30, .21);
+    leaf(0, -2.40, -Math.PI / 2, .82, .18, .065);
     for (const side of [-1, 1]) {
-      leaf(side * .04, .08, -Math.PI / 2 + side * .65, .72, .22, .09);
-      stroke([[side * .05, .44], [side * .43, .52], [side * .44, -.05], [side * .23, -.23]], .048);
+      leaf(side * .035, -2.35, -Math.PI / 2 + side * .72, .60, .15, .055);
+      stroke([[side * .04, -2.02, .016], [side * .36, -1.98, .025], [side * .35, -2.51, .027], [side * .18, -2.68, .018]], .025);
+      stroke([[side * .15, -3.08, .008], [side * .12, -3.63, .012], [side * .07, -4.53, .010], [side * .06, -5.25, .008]], .012);
+      for (let i = 0; i < 6; i++) {
+        const y = -3.02 - i * .32, size = .38 - i * .032;
+        leaf(side * .014, y, -Math.PI / 2 + side * .55, size, size * .30, .032 - i * .002);
+      }
+      leaf(side * .012, -5.22, -Math.PI / 2 + side * .42, .37, .065, .032);
     }
+    stroke([[0, -2.86, .020], [0, -3.52, .019], [0, -4.52, .013], [0, -5.45, .012]], .014);
+    // A small rolled leaf terminates the ornament at each scroll foot.
+    stroke([[-.10, -5.54, .012], [-.12, -5.76, .025], [.13, -5.76, .028], [.10, -5.56, .018]], .019);
+    leaf(-.035, -5.47, -Math.PI / 2 + .24, .22, .075, .035);
+    wrap = null;
   }
   // Both side aprons receive the same pierced-looking scrollwork.
   for (const side of [-1, 1]) {
@@ -168,10 +231,26 @@ export function createCarvings(paint, edgePaint, patina) {
     stroke([[.15, -.60], [.85, -.72], [.72, -.13], [.48, -.27]], .023);
     rose(.16, -.15, .15);
   }
-  for (let i = 0; i < 150; i++) {
-    const x = -7.20 + i * 14.40 / 149;
-    frame = at(x, -.22, 3.68 - .10 * Math.cos(x * Math.PI / 7.2));
-    add(new THREE.SphereGeometry(1, 8, 6), 1, new THREE.Matrix4().makeScale(.031, .035, .025));
+  // A continuous low laurel ribbon follows the serpentine top rim, outside
+  // the writing area. Separate bead-and-reel carving sits in the edge fillet.
+  const rim = desktopOutline(14.96, 7.35), edge = desktopOutline(15.07, 7.46);
+  const rimPoints = rim.getSpacedPoints(480).slice(0, -1).map(p => new THREE.Vector3(p.x, .208, p.y));
+  frame.identity();
+  add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(rimPoints, true), 720, .010, 6, true), 1);
+  const repeat = Math.round(rim.getLength() / .29);
+  for (let i = 0; i < repeat; i++) {
+    const { p, tangent, outward } = perimeterFrame(rim, i / repeat);
+    frame.makeBasis(new THREE.Vector3(tangent.x, 0, tangent.y), new THREE.Vector3(outward.x, 0, outward.y), new THREE.Vector3(0, 1, 0)).setPosition(p.x, .203, p.y);
+    const variation = 1 + .025 * Math.sin(i * 4.17);
+    leaf(-.10, 0, .44, .22 * variation, .047, .020);
+    leaf(-.10, 0, -.44, .22 * variation, .047, .020);
+  }
+  const beads = Math.round(edge.getLength() / .14);
+  for (let i = 0; i < beads; i++) {
+    const { p, tangent, outward } = perimeterFrame(edge, i / beads);
+    frame.makeBasis(new THREE.Vector3(-tangent.x, 0, -tangent.y), new THREE.Vector3(0, 1, 0), new THREE.Vector3(outward.x, 0, outward.y)).setPosition(p.x + outward.x * .010, -.25, p.y + outward.y * .010);
+    const scale = i % 3 ? new THREE.Vector3(.042, .033, .026) : new THREE.Vector3(.018, .041, .024);
+    add(new THREE.SphereGeometry(1, 10, 8), 0, new THREE.Matrix4().makeScale(scale));
   }
   for (let i = 0; i < parts.length; i++) if (parts[i].length) {
     const mesh = new THREE.Mesh(mergeGeometries(parts[i]), finishes[i]);

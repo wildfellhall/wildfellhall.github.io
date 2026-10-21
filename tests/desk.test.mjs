@@ -92,14 +92,14 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=detail-2$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=carving-3$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   await page.screenshot({ path: 'test-results/fallback.png' });
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=detail-2$/);
+  }), /desk-still-wide\.webp\?v=carving-3$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });
