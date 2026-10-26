@@ -1,6 +1,53 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
+const FIELD_RX = 2.30, FIELD_RY = .555;
+
+export function crestFieldHeight(x, y) {
+  const radius = Math.min(1, (x / FIELD_RX) ** 2 + (y / FIELD_RY) ** 2);
+  return .052 + .014 * (1 - radius) ** 2;
+}
+
+export function crestFieldGradient(x, y, target) {
+  const falloff = Math.max(0, 1 - (x / FIELD_RX) ** 2 - (y / FIELD_RY) ** 2);
+  return target.set(-.056 * x / FIELD_RX ** 2 * falloff, -.056 * y / FIELD_RY ** 2 * falloff);
+}
+
+function crownedField() {
+  const rings = 32, segments = 256, positions = [0, 0, crestFieldHeight(0, 0)], uv = [.5, .5], indices = [];
+  for (let ring = 1; ring <= rings; ring++) for (let i = 0; i < segments; i++) {
+    const angle = i / segments * Math.PI * 2, r = ring / rings;
+    const x = FIELD_RX * r * Math.cos(angle), y = FIELD_RY * r * Math.sin(angle);
+    positions.push(x, y, crestFieldHeight(x, y)); uv.push(x / (FIELD_RX * 2) + .5, y / (FIELD_RY * 2) + .5);
+    const a = 1 + (ring - 1) * segments + i, b = 1 + (ring - 1) * segments + (i + 1) % segments;
+    if (ring === 1) indices.push(0, a, b);
+    else indices.push(a - segments, a, b - segments, a, b, b - segments);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geometry.setIndex(indices); geometry.computeVertexNormals();
+  return geometry;
+}
+
+function patinatedField() {
+  const w = 512, h = 128, pixels = new Uint8Array(w * h * 4); let seed = 1876;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    const grain = seed / 4294967296 - .5;
+    const bloom = Math.sin(x * .027 + Math.sin(y * .063)) * Math.sin(y * .052 + x * .012);
+    const radius = Math.hypot(x / (w - 1) * 2 - 1, y / (h - 1) * 2 - 1);
+    // Gentle oxidation and handling wear vary the material's albedo. Light
+    // and contact shadows still come entirely from the physical scene.
+    const wear = 1 + bloom * .045 + grain * .035 - THREE.MathUtils.smoothstep(radius, .72, 1) * .07;
+    pixels.set([94 * wear, 79 * wear, 56 * wear, 255], (y * w + x) * 4);
+  }
+  const texture = new THREE.DataTexture(pixels, w, h); texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
+  texture.generateMipmaps = true; texture.needsUpdate = true;
+  return texture;
+}
+
 // All of the metalwork is modelled in the plaque's plane, with +Z facing out.
 // The containing group places this plane flat on the writing surface.
 function ovalMolding(rx, ry) {
@@ -97,11 +144,12 @@ function workedMetal() {
 
 export function createNameCrestMetalwork(brass) {
   const group = new THREE.Group(); group.name = 'oval-floral-name-crest';
-  // Match the desk hardware's alloy; only the surface finish varies between
-  // the satin field, cast foliage, and lightly burnished rims and letter faces.
+  // Match the hardware's brass on the exposed relief. The protected field
+  // retains a darker oxide patina, contrasting with its polished inscription.
   const texture = workedMetal(), cast = brass.clone();
   cast.roughnessMap = cast.bumpMap = texture; cast.roughness = .55; cast.bumpScale = .00055;
-  const satin = cast.clone(); satin.roughness = .79;
+  const satin = cast.clone(); satin.color.set('#ffffff'); satin.map = patinatedField();
+  satin.metalness = .72; satin.roughness = .82; satin.bumpScale = .00075;
   const burnished = cast.clone(); burnished.roughness = .40;
   function mesh(geometry, material, name) {
     const object = new THREE.Mesh(geometry, material); object.name = name;
@@ -109,7 +157,8 @@ export function createNameCrestMetalwork(brass) {
   }
   const oval = new THREE.Shape(); oval.absellipse(0, 0, 2.40, .66, 0, Math.PI * 2, false);
   mesh(new THREE.ExtrudeGeometry(oval, { depth: .041, bevelEnabled: true, bevelSize: .012,
-    bevelThickness: .010, bevelSegments: 5, curveSegments: 120 }), satin, 'solid-oval-plaque');
+    bevelThickness: .010, bevelSegments: 5, curveSegments: 120 }), cast, 'solid-oval-plaque');
+  mesh(crownedField(), satin, 'gently-crowned-patinated-field');
   mesh(ovalMolding(2.35, .61), burnished, 'continuous-oval-molding');
 
   const foliage = [], flowers = [];
