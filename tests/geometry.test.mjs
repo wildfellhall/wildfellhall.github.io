@@ -5,6 +5,7 @@ import { drawerTray } from '../src/drawer-tray.js';
 import { desktopOutline, sweptMolding } from '../src/furniture-profiles.js';
 import { createCarvings } from '../src/ornaments.js';
 import { createFrameMetalwork } from '../src/control-frame.js';
+import { createNameCrestMetalwork } from '../src/name-crest.js';
 
 test('drawer interiors form a closed shell with consistently facing surfaces', () => {
   for (const width of [4.13, 4.48]) {
@@ -72,4 +73,37 @@ test('the cast metal frame has a closed molding and finite relief surfaces', () 
     for (const key of ['position', 'normal']) assert.ok(object.geometry.attributes[key].array.every(Number.isFinite));
     object.geometry.dispose(); object.material.dispose();
   });
+});
+
+test('the oval name crest has a closed rim and outward-facing floral relief', () => {
+  const brass = new THREE.MeshStandardMaterial({ color: '#9c7844', metalness: .84, roughness: .39 });
+  const crest = createNameCrestMetalwork(brass), rim = crest.getObjectByName('continuous-oval-molding');
+  const edges = new Map(), a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), normal = new THREE.Vector3();
+  for (let i = 0; i < rim.geometry.index.count; i += 3) {
+    const vertices = [0, 1, 2].map(j => rim.geometry.index.getX(i + j));
+    for (let j = 0; j < 3; j++) {
+      const key = [vertices[j], vertices[(j + 1) % 3]].sort((x, y) => x - y).join(',');
+      edges.set(key, (edges.get(key) || 0) + 1);
+    }
+  }
+  assert.ok([...edges.values()].every(count => count === 2), 'The oval molding must have no open seam');
+  const materials = new Set([brass]), textures = new Set();
+  crest.traverse(object => {
+    if (!object.isMesh) return;
+    const geometry = object.geometry, p = geometry.attributes.position, n = geometry.attributes.normal;
+    assert.ok(p.array.every(Number.isFinite) && n.array.every(Number.isFinite));
+    for (let i = 0; i < (geometry.index?.count ?? p.count); i += 3) {
+      const vertices = [0, 1, 2].map(j => geometry.index ? geometry.index.getX(i + j) : i + j);
+      a.fromBufferAttribute(p, vertices[0]); b.fromBufferAttribute(p, vertices[1]); c.fromBufferAttribute(p, vertices[2]);
+      const face = b.sub(a).cross(c.sub(a)); normal.set(0, 0, 0);
+      for (const vertex of vertices) normal.add(new THREE.Vector3().fromBufferAttribute(n, vertex));
+      if (face.lengthSq() > 1e-16) assert.ok(face.dot(normal) > 0, `${object.name} must shade on its outward-facing surface`);
+    }
+    geometry.dispose(); materials.add(object.material);
+  });
+  for (const material of materials) {
+    if (material.bumpMap) textures.add(material.bumpMap);
+    material.dispose();
+  }
+  for (const texture of textures) texture.dispose();
 });

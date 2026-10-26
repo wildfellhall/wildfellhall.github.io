@@ -2,58 +2,31 @@ import * as THREE from 'three';
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { desktopOutline, perimeterFrame, legProfile } from './furniture-profiles.js';
+import { createNameCrestMetalwork } from './name-crest.js';
 
-function giltFinish() {
-  const w = 512, h = 128, colour = new Uint8Array(w * h * 4), roughness = new Uint8Array(w * h * 4), relief = new Uint8Array(w * h * 4);
-  let seed = 1848;
-  const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    const i = (y * w + x) * 4, n = random() - .5;
-    const burnish = Math.sin(x * .13 + Math.sin(y * .09)) * 2 + Math.sin(y * .3) * 1.6;
-    const join = x % 93 === 0 ? 5 : 0;
-    colour.set([204 + n * 9 + burnish - join, 163 + n * 8 + burnish - join, 83 + n * 6 + burnish - join, 255], i);
-    roughness.set([130 + n * 30 + join, 130 + n * 30 + join, 130 + n * 30 + join, 255], i);
-    relief.set([128 + n * 22 + burnish, 128 + n * 22 + burnish, 128 + n * 22 + burnish, 255], i);
-  }
-  const textures = [colour, roughness, relief].map(data => {
-    const texture = new THREE.DataTexture(data, w, h);
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = true; texture.needsUpdate = true;
-    return texture;
-  });
-  textures[0].colorSpace = THREE.SRGBColorSpace;
-  return textures;
-}
-
-export async function createEmbossing(surfaceY) {
+export async function createEmbossing(surfaceY, brass) {
   const svg = await new SVGLoader().loadAsync(`${import.meta.env.BASE_URL}ornaments/wildfell-hall.svg`);
   const geometry = new THREE.ExtrudeGeometry(svg.paths.flatMap(path => SVGLoader.createShapes(path)), {
-    depth: 1.7, bevelEnabled: true, bevelThickness: .65, bevelSize: .62, bevelSegments: 5, curveSegments: 24,
+    depth: 4, bevelEnabled: true, bevelThickness: 1, bevelSize: .62, bevelSegments: 5, curveSegments: 24,
   });
   geometry.computeBoundingBox();
   const box = geometry.boundingBox, center = box.getCenter(new THREE.Vector3());
   const scale = 3.25 / (box.max.x - box.min.x);
   geometry.translate(-center.x, -center.y, 0);
-  geometry.scale(scale, -scale, scale);
-  reverseWinding(geometry);
-  geometry.rotateX(-Math.PI / 2);
-  geometry.computeVertexNormals();
-  geometry.computeBoundingBox();
-  const extents = geometry.boundingBox, positions = geometry.attributes.position, uv = geometry.attributes.uv;
-  for (let i = 0; i < positions.count; i++) uv.setXY(i,
-    (positions.getX(i) - extents.min.x) / (extents.max.x - extents.min.x),
-    (positions.getZ(i) - extents.min.z) / (extents.max.z - extents.min.z));
-  const [map, roughnessMap, bumpMap] = giltFinish();
-  const face = new THREE.MeshStandardMaterial({ map, roughnessMap, bumpMap, bumpScale: .0006, metalness: .92, roughness: .72, envMapIntensity: 1.15 });
-  const bevel = new THREE.MeshStandardMaterial({ color: '#a77d3c', metalness: .9, roughness: .32, envMapIntensity: 1.05 });
+  geometry.scale(scale, -scale, .022 / 4);
+  reverseWinding(geometry); geometry.computeVertexNormals();
+  const face = brass.clone(); face.color.set('#c9a259'); face.metalness = .92; face.roughness = .34;
+  const bevel = brass.clone(); bevel.roughness = .31;
   const lettering = new THREE.Mesh(geometry, [face, bevel]);
-  // The lower bevel beds into the timber; only the thin gilded crown rises
-  // above the surface. No duplicate outline or floating backing plate.
-  lettering.position.set(0, surfaceY + .0004, -2.52);
+  lettering.position.z = .052;
   lettering.name = 'burnished-gold-script-with-beveled-edges';
   lettering.castShadow = lettering.receiveShadow = true;
-  return lettering;
+  const crest = createNameCrestMetalwork(brass);
+  crest.add(lettering); crest.rotation.x = -Math.PI / 2;
+  // Bed the plaque's back bevel into the timber. The inscription and flowers
+  // belong to the same physical object and receive the room's actual light.
+  crest.position.set(0, surfaceY + .004, -2.35);
+  return crest;
 }
 
 function reverseWinding(geometry) {
