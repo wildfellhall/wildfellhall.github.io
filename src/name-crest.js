@@ -1,16 +1,16 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const FIELD_RX = 2.30, FIELD_RY = .555;
+const FIELD_RX = 2.30, FIELD_RY = .555, FIELD_CROWN = .026;
 
 export function crestFieldHeight(x, y) {
   const radius = Math.min(1, (x / FIELD_RX) ** 2 + (y / FIELD_RY) ** 2);
-  return .052 + .014 * (1 - radius) ** 2;
+  return .052 + FIELD_CROWN * (1 - radius) ** 2;
 }
 
 export function crestFieldGradient(x, y, target) {
   const falloff = Math.max(0, 1 - (x / FIELD_RX) ** 2 - (y / FIELD_RY) ** 2);
-  return target.set(-.056 * x / FIELD_RX ** 2 * falloff, -.056 * y / FIELD_RY ** 2 * falloff);
+  return target.set(-4 * FIELD_CROWN * x / FIELD_RX ** 2 * falloff, -4 * FIELD_CROWN * y / FIELD_RY ** 2 * falloff);
 }
 
 function crownedField() {
@@ -30,22 +30,33 @@ function crownedField() {
   return geometry;
 }
 
-function patinatedField() {
-  const w = 512, h = 128, pixels = new Uint8Array(w * h * 4); let seed = 1876;
+function brushedBronze() {
+  const w = 1024, h = 256;
+  const colour = new Uint8Array(w * h * 4), roughness = new Uint8Array(w * h * 4), normal = new Uint8Array(w * h * 4);
+  let seed = 1876;
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
     seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
     const grain = seed / 4294967296 - .5;
-    const bloom = Math.sin(x * .027 + Math.sin(y * .063)) * Math.sin(y * .052 + x * .012);
     const radius = Math.hypot(x / (w - 1) * 2 - 1, y / (h - 1) * 2 - 1);
-    // Gentle oxidation and handling wear vary the material's albedo. Light
-    // and contact shadows still come entirely from the physical scene.
-    const wear = 1 + bloom * .045 + grain * .035 - THREE.MathUtils.smoothstep(radius, .72, 1) * .07;
-    pixels.set([94 * wear, 79 * wear, 56 * wear, 255], (y * w + x) * 4);
+    const edge = THREE.MathUtils.smoothstep(radius, .82, 1);
+    const brushing = Math.sin(y * 1.81 + Math.sin(x * .013) * .16) * .55 + Math.sin(y * 2.73 + x * .001) * .25;
+    // Directional polishing marks perturb the reflection, not the painted
+    // colour. Oxidation stays in the protected lip of the cast bronze field.
+    const wear = 1 - edge * .075 + grain * .009;
+    const r = 205 + edge * 20 + brushing * 7 + grain * 9;
+    const i = (y * w + x) * 4;
+    colour.set([166 * wear, 139 * wear, 91 * wear, 255], i);
+    roughness.set([r, r, r, 255], i);
+    normal.set([128 + grain * .8, 128 + brushing * 5 + grain, 255, 255], i);
   }
-  const texture = new THREE.DataTexture(pixels, w, h); texture.colorSpace = THREE.SRGBColorSpace;
-  texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
-  texture.generateMipmaps = true; texture.needsUpdate = true;
-  return texture;
+  const textures = [colour, roughness, normal].map(pixels => {
+    const texture = new THREE.DataTexture(pixels, w, h);
+    texture.minFilter = THREE.LinearMipmapLinearFilter; texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = true; texture.needsUpdate = true;
+    return texture;
+  });
+  textures[0].colorSpace = THREE.SRGBColorSpace;
+  return textures;
 }
 
 // All of the metalwork is modelled in the plaque's plane, with +Z facing out.
@@ -144,12 +155,14 @@ function workedMetal() {
 
 export function createNameCrestMetalwork(brass) {
   const group = new THREE.Group(); group.name = 'oval-floral-name-crest';
-  // Match the hardware's brass on the exposed relief. The protected field
-  // retains a darker oxide patina, contrasting with its polished inscription.
+  // The gold relief surrounds a polished bronze field. A conducting surface
+  // and directional reflections keep the inset recognisably metallic.
   const texture = workedMetal(), cast = brass.clone();
   cast.roughnessMap = cast.bumpMap = texture; cast.roughness = .55; cast.bumpScale = .00055;
-  const satin = cast.clone(); satin.color.set('#ffffff'); satin.map = patinatedField();
-  satin.metalness = .72; satin.roughness = .82; satin.bumpScale = .00075;
+  const [map, roughnessMap, normalMap] = brushedBronze();
+  const satin = new THREE.MeshPhysicalMaterial({ map, roughnessMap, normalMap,
+    metalness: .98, roughness: .24, anisotropy: .40, anisotropyRotation: 0,
+    normalScale: new THREE.Vector2(.20, .20) });
   const burnished = cast.clone(); burnished.roughness = .40;
   function mesh(geometry, material, name) {
     const object = new THREE.Mesh(geometry, material); object.name = name;

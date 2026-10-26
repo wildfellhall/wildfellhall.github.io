@@ -10,6 +10,7 @@
     "textures": "python3 scripts/make-materials.py && python3 scripts/make-drawer-materials.py && node scripts/make-ornaments.mjs && python3 scripts/make-control-linen.py",
     "drawer-textures": "python3 scripts/make-drawer-materials.py",
     "ornaments": "node scripts/make-ornaments.mjs",
+    "lettering": "node scripts/make-lettering.mjs",
     "fallback": "node scripts/capture-fallback.mjs",
     "frame-fallback": "node scripts/capture-control-frame.mjs",
     "test": "node --test tests/*.test.mjs"
@@ -18,7 +19,7 @@
     "three": "0.180.0"
   },
   "devDependencies": {
-    "@fontsource/great-vibes": "^5.3.0",
+    "@fontsource/pinyon-script": "^5.3.0",
     "@playwright/test": "1.56.1",
     "opentype.js": "^2.0.0",
     "sharp": "^0.35.5",

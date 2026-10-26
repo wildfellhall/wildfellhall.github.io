@@ -102,8 +102,7 @@ test('the oval name crest has a closed rim and outward-facing floral relief', ()
     geometry.dispose(); materials.add(object.material);
   });
   for (const material of materials) {
-    if (material.map) textures.add(material.map);
-    if (material.bumpMap) textures.add(material.bumpMap);
+    for (const key of ['map', 'bumpMap', 'roughnessMap', 'normalMap']) if (material[key]) textures.add(material[key]);
     material.dispose();
   }
   for (const texture of textures) texture.dispose();

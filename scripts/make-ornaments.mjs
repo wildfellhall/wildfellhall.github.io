@@ -1,23 +1,10 @@
 // Local, deterministic vector design and rasterization. No image services.
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import opentype from 'opentype.js';
+import { mkdir, writeFile } from 'node:fs/promises';
 import sharp from 'sharp';
+import './make-lettering.mjs';
 
 const out = new URL('../public/ornaments/', import.meta.url);
 await mkdir(out, { recursive: true });
-const bytes = await readFile(new URL('../node_modules/@fontsource/great-vibes/files/great-vibes-latin-400-normal.woff', import.meta.url));
-const font = opentype.parse(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-const letters = new opentype.Path();
-const glyphs = [...'Wildfell Hall'].map(character => font.charToGlyph(character));
-let pen = 0;
-for (let i = 0; i < glyphs.length; i++) {
-  letters.extend(glyphs[i].getPath(pen, 0, 160));
-  pen += (glyphs[i].advanceWidth + (glyphs[i + 1] ? font.getKerningValue(glyphs[i], glyphs[i + 1]) : 0)) * 160 / font.unitsPerEm;
-}
-const bounds = letters.getBoundingBox();
-const name = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.x1 - 3} ${bounds.y1 - 3} ${bounds.x2 - bounds.x1 + 6} ${bounds.y2 - bounds.y1 + 6}" fill="#ba8d36"><title>Wildfell Hall</title>${letters.toSVG({ flipY: false }).replace('fill="black"', '')}</svg>`;
-await writeFile(new URL('wildfell-hall.svg', out), name);
-await writeFile(new URL('great-vibes-OFL.txt', out), await readFile(new URL('../node_modules/@fontsource/great-vibes/LICENSE', import.meta.url)));
 
 const W = 2400, H = 1740;
 const use = (id, x, y, scale = 1, angle = 0) => `<use href="#${id}" transform="translate(${x} ${y}) rotate(${angle}) scale(${scale})"/>`;

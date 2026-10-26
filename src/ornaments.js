@@ -5,13 +5,13 @@ import { desktopOutline, perimeterFrame, legProfile } from './furniture-profiles
 import { createNameCrestMetalwork, crestFieldHeight, crestFieldGradient } from './name-crest.js';
 
 export async function createEmbossing(surfaceY, brass) {
-  const svg = await new SVGLoader().loadAsync(`${import.meta.env.BASE_URL}ornaments/wildfell-hall.svg`);
+  const svg = await new SVGLoader().loadAsync(`${import.meta.env.BASE_URL}ornaments/wildfell-hall.svg?v=roundhand-1`);
   const geometry = new THREE.ExtrudeGeometry(svg.paths.flatMap(path => SVGLoader.createShapes(path)), {
-    depth: 4, bevelEnabled: true, bevelThickness: 1, bevelSize: .85, bevelSegments: 5, curveSegments: 24,
+    depth: 4, bevelEnabled: true, bevelThickness: .8, bevelSize: .32, bevelSegments: 5, curveSegments: 28,
   });
   geometry.computeBoundingBox();
   const box = geometry.boundingBox, center = box.getCenter(new THREE.Vector3());
-  const scale = 3.42 / (box.max.x - box.min.x);
+  const scale = 2.95 / (box.max.x - box.min.x);
   geometry.translate(-center.x, -center.y, 0);
   geometry.scale(scale, -scale, .022 / 4);
   reverseWinding(geometry); geometry.computeVertexNormals();
@@ -28,7 +28,7 @@ export async function createEmbossing(surfaceY, brass) {
     normal.set(normal.x - gradient.x * normal.z, normal.y - gradient.y * normal.z, normal.z).normalize();
     normals.setXYZ(i, normal.x, normal.y, normal.z);
   }
-  const face = brass.clone(); face.color.set('#e2c581'); face.metalness = .90; face.roughness = .28;
+  const face = brass.clone(); face.color.set('#f2d995'); face.metalness = .95; face.roughness = .30;
   const bevel = brass.clone(); bevel.color.set('#bb9857'); bevel.roughness = .29;
   const lettering = new THREE.Mesh(geometry, [face, bevel]);
   lettering.position.z = .001;
