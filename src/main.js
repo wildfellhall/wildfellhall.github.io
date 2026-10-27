@@ -86,7 +86,11 @@ async function init() {
   });
   // A room-size carpet keeps the elevated composition on the blush textile.
   carpet.scale.set(1.85, 1, 1.85); carpet.position.z = -3;
-  scene.add(createFloor(), carpet, desk.group, book.group);
+  const furniture = new THREE.Group(); furniture.add(createFloor(), carpet, desk.group);
+  const readingGround = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: '#302620', roughness: 1 }));
+  readingGround.rotation.x = -Math.PI / 2; readingGround.position.y = DESK.surfaceY;
+  readingGround.receiveShadow = true; readingGround.visible = false;
+  scene.add(furniture, book.group, readingGround);
   renderer.shadowMap.needsUpdate = true;
 
   // Small-scale occlusion makes the carved undercuts read without painting black outlines.
@@ -101,7 +105,7 @@ async function init() {
 
   let width = 0, height = 0, frame = 0, lastTime = 0;
   let graphicsAvailable = true;
-  let currentLight = 0, currentDetail = 0;
+  let currentLight = 0, currentDetail = 0, wasReading = false;
   const pointer = new THREE.Vector2(), currentPointer = new THREE.Vector2();
   const interaction = createDeskInteraction({ canvas, room, camera, desk, book, status, invalidate, resetView: () => {
     setDetail(false); pointer.set(0, 0); currentPointer.set(0, 0);
@@ -111,12 +115,7 @@ async function init() {
   function resize() {
     width = room.clientWidth; height = room.clientHeight;
     renderer.setSize(width, height, false); composer.setSize(width, height);
-    // A narrow carpet surround on desktop; portrait crops the sides instead
-    // of shrinking the writing surface into the middle of a large floor.
-    const aspect = width / height, viewHeight = Math.min(12.2, Math.max(11.6, 17.6 / aspect));
-    camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
-    camera.top = viewHeight / 2; camera.bottom = -camera.top;
-    camera.updateProjectionMatrix();
+    renderer.shadowMap.needsUpdate = true;
     invalidate();
   }
   function invalidate() { if (!frame && !document.hidden && graphicsAvailable) frame = requestAnimationFrame(render); }
@@ -135,6 +134,14 @@ async function init() {
     hemisphere.color.copy(sky).lerp(duskSky, currentLight);
     hemisphere.intensity = .42 - currentLight * .10;
     renderer.toneMappingExposure = .94 - currentLight * .06;
+    // A narrow carpet surround on desktop; portrait crops the sides instead
+    // of shrinking the writing surface into the middle of a large floor.
+    const aspect = width / height, viewHeight = Math.min(12.2, Math.max(11.6, 17.6 / aspect));
+    camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
+    camera.top = viewHeight / 2; camera.bottom = -camera.top;
+    if (!interaction.reading) book.place(viewHeight * aspect, aspect <= .75);
+    furniture.visible = !interaction.reading; readingGround.visible = interaction.reading;
+    if (wasReading !== interaction.reading) { renderer.shadowMap.needsUpdate = true; wasReading = interaction.reading; }
     const target = baseTarget.clone();
     target.x += currentPointer.x * .07;
     target.y -= currentDetail * .15;
@@ -153,11 +160,13 @@ async function init() {
     if (unsettled || drawers.unsettled || pages.unsettled) invalidate();
   }
   room.addEventListener('pointermove', event => {
-    if (interaction.dragging || motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
+    if (interaction.reading || interaction.dragging || motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
     pointer.set((event.clientX / width - .5) * 2, (event.clientY / height - .5) * 2); invalidate();
   }, { passive: true });
   room.addEventListener('pointerleave', () => { pointer.set(0, 0); invalidate(); });
-  canvas.addEventListener('pointerdown', () => { pointer.set(0, 0); invalidate(); });
+  canvas.addEventListener('pointerdown', () => {
+    if (pointer.lengthSq() || currentPointer.lengthSq()) { pointer.set(0, 0); invalidate(); }
+  });
   motionQuery.addEventListener('change', () => { pointer.set(0, 0); invalidate(); });
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { cancelAnimationFrame(frame); frame = 0; }

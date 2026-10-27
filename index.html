@@ -13,14 +13,14 @@
     <main id="room" aria-label="An antique white wooden writing desk">
       <div id="desk-fallback" aria-hidden="true">
         <picture>
-          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=book-1" />
-          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=book-1" />
-          <img src="./materials/desk-still.webp?v=book-1" alt="" fetchpriority="high" />
+          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=book-2" />
+          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=book-2" />
+          <img src="./materials/desk-still.webp?v=book-2" alt="" fetchpriority="high" />
         </picture>
       </div>
       <h1 class="sr-only">Wildfell Hall</h1>
       <canvas id="desk" aria-describedby="desk-help" aria-label="An elevated view of an antique ivory writing desk, with a maroon leather-bound copy of The Tenant of Wildfell Hall, visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, a brass oval crest with embossed gold script, roses and leaves, and a light pink floral carpet"></canvas>
-      <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space. Click the maroon book to open it. Click the right page to turn forward, or the left page to turn back. With the book open, the left and right arrow keys turn pages and Escape closes it. Tab also reaches the book and page controls.</p>
+      <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space. Click the maroon book to open it. Double-click or double-tap the book for a full-screen reading view, or use the Read book full screen button. Click the right page to turn forward, or the left page to turn back. With the book open, the left and right arrow keys turn pages. Escape returns from reading view to the same page on the desk; otherwise it closes the book. Tab also reaches the book and page controls.</p>
       <div id="book-controls" role="group" aria-label="The Tenant of Wildfell Hall, blank aged pages" hidden>
         <button class="book-hotspot" data-book-action="toggle" aria-label="Open The Tenant of Wildfell Hall" aria-expanded="false"></button>
         <button class="book-hotspot" data-book-action="previous" aria-label="Previous blank page" hidden></button>
@@ -40,6 +40,13 @@
               <path d="M25 6H10q-4 0-4 4v14q0 4 4 4h15V6ZM6 24q0-3 4-3h15M10 7v13"/>
               <path class="icon-detail" d="M12 9h10v9H12ZM10 24h12M10 26h12"/>
               <path d="M5 14H2m0 0 3-3m-3 3 3 3"/>
+            </svg>
+          </button>
+          <button id="book-read" aria-label="Read book full screen" aria-pressed="false" hidden>
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" aria-hidden="true" focusable="false">
+              <path class="icon-wash" d="M7 10q5-2 9 1 4-3 9-1v13q-5-2-9 1-4-3-9-1Z"/>
+              <path d="M7 10q5-2 9 1 4-3 9-1v13q-5-2-9 1-4-3-9-1ZM16 11v13M10 4H4v6m18-6h6v6M4 22v6h6m12 0h6v-6"/>
+              <path class="icon-detail" d="M9 13q3-1 5 1m4 0q2-2 5-1M9 16q3-1 5 1m4 0q2-2 5-1M6 7l2-1m16 0 2 1M6 25l2 1m16 0 2-1"/>
             </svg>
           </button>
           <button id="light-toggle" aria-label="Change to evening light" aria-pressed="false">

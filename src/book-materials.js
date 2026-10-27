@@ -33,7 +33,8 @@ export function createBookMaterials() {
   for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
     // Small irregular grains, with narrower creases between them. Fine pores
     // sit above this structure instead of making the leather look like noise.
-    const u = x / 6.5, v = y / 8.2, ix = Math.floor(u), iy = Math.floor(v);
+    const u = (x + softNoise(x / 70, y / 95) * 10) / 8.8;
+    const v = (y + softNoise(x / 90 + 17, y / 60) * 10) / 11.2, ix = Math.floor(u), iy = Math.floor(v);
     let first = 9, second = 9;
     for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
       const a = ix + dx, b = iy + dy;
@@ -46,15 +47,24 @@ export function createBookMaterials() {
     const edge = Math.min(x, y, size - 1 - x, size - 1 - y) / size;
     const wear = Math.exp(-edge * 170) * (.35 + rng() * .45);
     const joint = Math.exp(-(((x / size - .047) / .006) ** 2));
-    const tone = 1 + mottling + (grain - .5) * .10 + pore * .035 - joint * .13;
+    const tone = 1 + mottling + (grain - .5) * .20 + pore * .035 - joint * .13;
     const i = (y * size + x) * 4;
     colour.set([83 * tone + wear * 42, 26 * tone + wear * 24, 39 * tone + wear * 14, 255], i);
-    const h = 88 + grain * 88 + pore * 13 - joint * 48;
+    const h = 78 + grain * 108 + pore * 10 - joint * 48;
     height.set([h, h, h, 255], i);
-    const r = 180 + (1 - grain) * 30 + pore * 12 - wear * 28;
+    const r = 163 + (1 - grain) * 64 + pore * 12 - wear * 28;
     roughness.set([r, r, r, 255], i);
   }
-  const leather = new THREE.MeshPhysicalMaterial({ map: texture(colour, size, true), bumpMap: texture(height, size),
+  // Tangent-space normals keep the pebbled relief legible under the room's
+  // broad window lighting, including when the smaller book is seen obliquely.
+  const normals = new Uint8Array(colour.length);
+  const h = (x, y) => height[(Math.max(0, Math.min(size - 1, y)) * size + Math.max(0, Math.min(size - 1, x))) * 4] / 255;
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    const nx = (h(x - 1, y) - h(x + 1, y)) * 1.1, ny = (h(x, y - 1) - h(x, y + 1)) * 1.1;
+    const length = Math.hypot(nx, ny, 1);
+    normals.set([(nx / length * .5 + .5) * 255, (ny / length * .5 + .5) * 255, (1 / length * .5 + .5) * 255, 255], (y * size + x) * 4);
+  }
+  const leather = new THREE.MeshPhysicalMaterial({ map: texture(colour, size, true), bumpMap: texture(height, size), normalMap: texture(normals, size),
     roughnessMap: texture(roughness, size), bumpScale: .018, roughness: .76, metalness: 0,
     clearcoat: .06, clearcoatRoughness: .65 });
   const gold = new THREE.MeshStandardMaterial({ color: '#e7c478', metalness: .90, roughness: .34, envMapIntensity: 1.4,

@@ -12,7 +12,8 @@ const CLOSED_HINGE = .368, OPEN_HINGE = .040;
 export async function createBook(surfaceY) {
   const materials = createBookMaterials(), motion = new BookMotion();
   const group = new THREE.Group(); group.name = 'tenant-of-wildfell-hall';
-  group.position.set(0, surfaceY + .004, .40); group.rotation.y = -.065;
+  group.position.set(4.25, surfaceY + .004, -1.55); group.rotation.y = -.065;
+  group.scale.setScalar(.76);
   function mesh(geometry, material, parent, name, action) {
     const object = new THREE.Mesh(geometry, material); object.name = name;
     object.castShadow = object.receiveShadow = true;
@@ -114,6 +115,13 @@ export async function createBook(surfaceY) {
   updateGeometry();
   return {
     group, motion,
+    width: COVER_WIDTH * 2 * group.scale.x, depth: COVER_DEPTH * group.scale.z,
+    place(viewWidth, portrait) {
+      // Keep the corner object within the cropped writing surface on phones.
+      group.position.x = portrait ? .15 : Math.min(4.25, Math.max(.15, viewWidth / 2 - COVER_WIDTH * group.scale.x - .35));
+      group.position.z = portrait ? .65 : -1.55;
+      group.updateMatrixWorld(true);
+    },
     activate(action) {
       if (action === 'toggle') return motion.opened ? motion.close() : motion.open();
       if (action === 'close') return motion.close();
