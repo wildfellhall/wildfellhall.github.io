@@ -67,7 +67,7 @@ function brushedBronze() {
     const wear = 1 - edge * .075 + grain * .009;
     const r = 188 + edge * 20 + brushing * 7 + grain * 16;
     const i = (y * w + x) * 4;
-    colour.set([142 * wear, 116 * wear, 76 * wear, 255], i);
+    colour.set([128 * wear, 102 * wear, 65 * wear, 255], i);
     roughness.set([r, r, r, 255], i);
     normal.set([128 + grain * 2, 128 + brushing * 3 + grain * 2, 255, 255], i);
   }
@@ -175,6 +175,38 @@ function workedMetal() {
   return texture;
 }
 
+function inscriptionFlourishes() {
+  const pieces = [];
+  // Low chased gold scrolls bracket the words, leaving the capitals and
+  // descenders clear. Each hairline tapers into the bronze at both ends.
+  const points = [[.055, .376], [.32, .417], [.65, .421], [.90, .39],
+    [1.01, .35], [.995, .31], [.94, .29], [.87, .31], [.86, .35], [.89, .37], [.92, .355]];
+  for (const sx of [-1, 1]) for (const sy of [-1, 1]) {
+    const curve = new THREE.CatmullRomCurve3(points.map(([x, y]) => new THREE.Vector3(x * sx, y * sy, 0)));
+    const geometry = new THREE.TubeGeometry(curve, 80, .009, 10, false);
+    const p = geometry.attributes.position;
+    for (let row = 0; row <= 80; row++) {
+      const t = row / 80, center = curve.getPointAt(t);
+      const taper = .12 + .88 * THREE.MathUtils.smoothstep(t, 0, .08) * THREE.MathUtils.smoothstep(1 - t, 0, .12);
+      for (let col = 0; col <= 10; col++) {
+        const i = row * 11 + col;
+        const x = center.x + (p.getX(i) - center.x) * taper;
+        const y = center.y + (p.getY(i) - center.y) * taper;
+        p.setXYZ(i, x, y, crestFieldHeight(x, y) + p.getZ(i) * .55 * taper + .001 - .003 * (1 - taper));
+      }
+    }
+    geometry.computeVertexNormals(); pieces.push(geometry);
+  }
+  for (const sy of [-1, 1]) {
+    const pearl = new THREE.SphereGeometry(1, 16, 10);
+    pearl.scale(.014, .022, .006); pearl.translate(0, sy * .379, crestFieldHeight(0, sy * .379) + .002);
+    pieces.push(pearl);
+  }
+  const geometry = mergeGeometries(pieces);
+  pieces.forEach(piece => piece.dispose());
+  return geometry;
+}
+
 export function createNameCrestMetalwork(brass) {
   const group = new THREE.Group(); group.name = 'oval-floral-name-crest';
   // Cast bronze with a worked ground and burnished relief, all lit by the room.
@@ -194,6 +226,8 @@ export function createNameCrestMetalwork(brass) {
     bevelThickness: .010, bevelSegments: 5, curveSegments: 120 }), cast, 'solid-oval-plaque');
   mesh(crownedField(), satin, 'worked-metal-field');
   mesh(ovalMolding(2.35, .61), burnished, 'continuous-oval-molding');
+  const chased = brass.clone(); chased.color.set('#c7a365'); chased.roughness = .38;
+  mesh(inscriptionFlourishes(), chased, 'fine-scrolls-around-the-inscription');
 
   const foliage = [], flowers = [];
   function add(geometry, x = 0, y = 0, z = .064, angle = 0, batch = foliage) {

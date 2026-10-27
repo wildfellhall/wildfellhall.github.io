@@ -12,7 +12,8 @@ export async function createEmbossing(surfaceY, brass, renderer) {
   });
   geometry.computeBoundingBox();
   const box = geometry.boundingBox, center = box.getCenter(new THREE.Vector3());
-  const scale = 2.90 / (box.max.x - box.min.x);
+  // Keep the inscription generous within the slightly smaller casting.
+  const scale = 3.04 / (box.max.x - box.min.x);
   geometry.translate(-center.x, -center.y, 0);
   geometry.scale(scale, -scale, .038 / 4);
   reverseWinding(geometry); geometry.computeVertexNormals();
@@ -29,8 +30,8 @@ export async function createEmbossing(surfaceY, brass, renderer) {
     normal.set(normal.x - gradient.x * normal.z, normal.y - gradient.y * normal.z, normal.z).normalize();
     normals.setXYZ(i, normal.x, normal.y, normal.z);
   }
-  const face = brass.clone(); face.color.set('#f2dba6'); face.metalness = .84; face.roughness = .31;
-  const bevel = brass.clone(); bevel.color.set('#b58d4d'); bevel.roughness = .34;
+  const face = brass.clone(); face.color.set('#ffe6ac'); face.metalness = .82; face.roughness = .30;
+  const bevel = brass.clone(); bevel.color.set('#9e783f'); bevel.roughness = .34;
   const lettering = new THREE.Mesh(geometry, [face, bevel]);
   lettering.position.z = .001;
   lettering.name = 'burnished-gold-script-with-beveled-edges';
@@ -42,7 +43,7 @@ export async function createEmbossing(surfaceY, brass, renderer) {
     field.aoMap = crestContactTexture(renderer, crest); field.aoMapIntensity = .95;
   }
   crest.rotation.x = -Math.PI / 2;
-  crest.scale.set(.72, .72, .62);
+  crest.scale.set(.64, .64, .56);
   // Bed the plaque's back bevel into the timber. The inscription and flowers
   // belong to the same physical object and receive the room's actual light.
   crest.position.set(0, surfaceY + .004, -2.35);
