@@ -8,6 +8,7 @@ import { createCarpet } from './ornaments.js';
 import { createDeskInteraction } from './desk-interaction.js';
 import { createControlFrame } from './control-frame.js';
 import { createBook } from './book.js';
+import { applyWoodCoordinates } from './wood-finish.js';
 
 const room = document.querySelector('#room'), canvas = document.querySelector('#desk');
 const status = document.querySelector('#render-status');
@@ -87,8 +88,10 @@ async function init() {
   // A room-size carpet keeps the elevated composition on the blush textile.
   carpet.scale.set(1.85, 1, 1.85); carpet.position.z = -3;
   const furniture = new THREE.Group(); furniture.add(createFloor(), carpet, desk.group);
-  const readingGround = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: '#302620', roughness: 1 }));
+  // Continue the desktop's actual grain field beneath the close reading view.
+  const readingGround = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), desk.surfaceMaterial);
   readingGround.rotation.x = -Math.PI / 2; readingGround.position.y = DESK.surfaceY;
+  applyWoodCoordinates(readingGround);
   readingGround.receiveShadow = true; readingGround.visible = false;
   scene.add(furniture, book.group, readingGround);
   renderer.shadowMap.needsUpdate = true;

@@ -2,6 +2,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
+import sharp from 'sharp';
 import { createServer } from 'vite';
 
 let server, browser;
@@ -103,8 +104,12 @@ test('double-click reads the book full screen without turning a page and restore
   assert.equal(await page.evaluate(() => document.fullscreenElement?.id), 'room');
   assert.equal(await page.locator('#room').getAttribute('data-book-page'), '0');
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
-  await page.screenshot({ path: 'test-results/book-reader-desktop.png' });
+  const reader = await page.screenshot({ path: 'test-results/book-reader-desktop.png' });
+  const wood = await sharp(reader).extract({ left: 12, top: 180, width: 40, height: 140 }).stats();
+  assert.ok(wood.channels.slice(0, 3).every(channel => channel.mean > 170), 'Fullscreen must retain the ivory wood behind the book');
+  assert.ok(wood.channels[0].stdev > .25, 'The wood backdrop must retain its rendered grain and shading');
   await page.keyboard.press('ArrowRight'); await page.locator('#room[data-book-page="1"]').waitFor();
+  await page.screenshot({ path: 'test-results/book-reader-turned.png' });
   await page.getByRole('button', { name: 'Return to desk', exact: true }).click();
   await page.locator('#room[data-book-reading="false"]').waitFor();
   await page.waitForFunction(() => !document.fullscreenElement); await nextFrame(page);
@@ -381,7 +386,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=book-2$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=book-3$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   assert.equal(await page.locator('#book-controls').isVisible(), false);
@@ -391,7 +396,7 @@ test('browsers without WebGL show the matching still desk', async () => {
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=book-2$/);
+  }), /desk-still-wide\.webp\?v=book-3$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });

@@ -67,18 +67,20 @@ export function createBookMaterials() {
   const leather = new THREE.MeshPhysicalMaterial({ map: texture(colour, size, true), bumpMap: texture(height, size), normalMap: texture(normals, size),
     roughnessMap: texture(roughness, size), bumpScale: .018, roughness: .76, metalness: 0,
     clearcoat: .06, clearcoatRoughness: .65 });
+  for (const map of [leather.map, leather.bumpMap, leather.normalMap, leather.roughnessMap]) map.wrapS = map.wrapT = THREE.RepeatWrapping;
   const gold = new THREE.MeshStandardMaterial({ color: '#e7c478', metalness: .90, roughness: .34, envMapIntensity: 1.4,
     bumpMap: leather.bumpMap, bumpScale: .00025 });
   const paper = [0, 1, 2].map(seed => paperMaterial(seed));
-  const edgeCanvas = document.createElement('canvas'); edgeCanvas.width = 512; edgeCanvas.height = 256;
-  const ctx = edgeCanvas.getContext('2d'); ctx.fillStyle = '#d5c6a4'; ctx.fillRect(0, 0, 512, 256);
-  for (let y = 0; y < 256; y++) {
-    const shade = 166 + rng() * 40;
-    ctx.fillStyle = `rgb(${shade + 24} ${shade + 13} ${shade - 14})`;
-    ctx.fillRect(0, y, 512, .4 + rng() * .45);
+  const edgeSize = 512, edgePixels = new Uint8Array(edgeSize * edgeSize * 4), edgeHeights = new Uint8Array(edgePixels.length);
+  for (let y = 0; y < edgeSize; y++) for (let x = 0; x < edgeSize; x++) {
+    const layers = y / edgeSize * 48, distance = Math.abs(layers - Math.round(layers));
+    const line = Math.exp(-((distance / .13) ** 2));
+    const fibre = softNoise(x / 8, y / 3) * 3, age = softNoise(x / 77, y / 71) * 5;
+    const shade = fibre + age - line * 8, i = (y * edgeSize + x) * 4;
+    edgePixels.set([226 + shade, 215 + shade, 192 + shade, 255], i);
+    const height = 145 - line * 24 + fibre; edgeHeights.set([height, height, height, 255], i);
   }
-  const edgeMap = new THREE.CanvasTexture(edgeCanvas); edgeMap.colorSpace = THREE.SRGBColorSpace;
-  const edges = new THREE.MeshStandardMaterial({ map: edgeMap, roughness: .93 });
+  const edges = new THREE.MeshStandardMaterial({ map: texture(edgePixels, edgeSize, true), bumpMap: texture(edgeHeights, edgeSize), bumpScale: .00045, roughness: .97 });
   return { leather, gold, paper, edges };
 }
 
@@ -90,7 +92,7 @@ function paperMaterial(seed) {
     const cloud = softNoise(x / 80 + seed * 19, y / 100) * 9 + softNoise(x / 27, y / 31 + seed * 23) * 3;
     const i = (y * size + x) * 4;
     pixels.set([235 - age * .7 + grain + cloud, 225 - age + grain + cloud, 201 - age * 1.4 + grain + cloud, 255], i);
-    const h = 126 + grain * 6; heights.set([h, h, h, 255], i);
+    const h = 126 + grain * 2 + softNoise(x / 3, y / 21) * 12; heights.set([h, h, h, 255], i);
   }
   // Sparse, diffuse foxing stays near the margins. The writing area is blank.
   for (let spot = 0; spot < 95; spot++) {

@@ -4,10 +4,9 @@ import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createBookMaterials } from './book-materials.js';
 import { BookMotion, LEAF_COUNT } from './book-motion.js';
-import { PAGE_WIDTH, PAGE_DEPTH, PAGE_BASE, SHEET_STEP, createLeafGeometry, bendLeaf, createPageBlock, sizePageBlock } from './book-geometry.js';
+import { PAGE_WIDTH, PAGE_DEPTH, PAGE_BASE, SHEET_STEP, createLeafGeometry, bendLeaf, createPageBlock, sizePageBlock, sewnHeight, paperProfile } from './book-geometry.js';
 
-const COVER_WIDTH = 2.48, COVER_DEPTH = 3.50, COVER_THICKNESS = .075;
-const CLOSED_HINGE = .368, OPEN_HINGE = .040;
+import { COVER_WIDTH, COVER_DEPTH, COVER_THICKNESS, CLOSED_HINGE, OPEN_HINGE, JOINT, BAND_POSITIONS, createSpineGeometry, updateSpineGeometry, createSpineFillet, updateSpineFillet } from './book-binding.js';
 
 export async function createBook(surfaceY) {
   const materials = createBookMaterials(), motion = new BookMotion();
@@ -35,44 +34,35 @@ export async function createBook(surfaceY) {
     const lining = mesh(new THREE.PlaneGeometry(COVER_WIDTH - .15, COVER_DEPTH - .15), materials.paper[2], parent, 'blank-aged-pastedown');
     lining.rotation.x = -sign * Math.PI / 2;
     lining.position.set(COVER_WIDTH / 2, sign * (COVER_THICKNESS / 2 + .001), 0);
+    lining.castShadow = false;
   }
   front.add(coverTooling(materials.gold));
   const title = await titleGeometry();
   mesh(title, materials.gold, front, 'gold-leaf-title').position.set(COVER_WIDTH / 2 + .035, COVER_THICKNESS / 2 + .001, -.03);
 
-  // Rounded leather spine, with five sewn raised bands. Its crown compresses
-  // as the board opens while the joints remain attached to the binding.
-  const spine = mesh(spineGeometry(), materials.leather, group, 'rounded-morocco-spine', 'toggle');
-  const bands = new THREE.Group(); group.add(bands);
-  for (const z of [-1.28, -.67, 0, .67, 1.28]) {
-    const points = [];
-    for (let i = 0; i <= 24; i++) {
-      const a = i / 24 * Math.PI;
-      points.push(new THREE.Vector3(-.018 - Math.sin(a) * .125, .204 + Math.cos(a) * .164, z));
-    }
-    const curve = new THREE.CatmullRomCurve3(points);
-    mesh(new THREE.TubeGeometry(curve, 32, .018, 10, false), materials.leather, bands, 'raised-sewing-band');
-    for (const shift of [-.033, .033]) {
-      const fillet = mesh(new THREE.TubeGeometry(curve, 32, .0035, 6, false), materials.gold, bands, 'gilt-spine-fillet');
-      fillet.position.z = shift;
-    }
+  const spine = mesh(createSpineGeometry(), materials.leather, group, 'continuous-leather-spine', 'toggle');
+  const fillets = [];
+  for (const z of BAND_POSITIONS) for (const shift of [-.036, .036]) {
+    const fillet = mesh(createSpineFillet(), materials.gold, group, 'gilt-spine-fillet');
+    fillets.push({ mesh: fillet, z: z + shift });
   }
-  const silks = ['#c5b48e', '#8c4b3e'].map(color => new THREE.MeshStandardMaterial({ color, roughness: .82 }));
-  for (const z of [-PAGE_DEPTH / 2, PAGE_DEPTH / 2]) {
-    const headband = new THREE.Group(); group.add(headband);
-    for (let i = 0; i < 18; i++) {
-      const bead = mesh(new THREE.SphereGeometry(.014, 8, 6), silks[i % 2], headband, 'sewn-headband');
-      bead.position.set(.018, PAGE_BASE + .014 + i * .0125, z); bead.scale.set(.8, .60, 1);
-    }
+  const hingePaper = materials.paper[2].clone();
+  // A paper-thin lap needs a depth offset to keep multisample coverage from
+  // exposing isolated pixels of the sheet underneath the overlap.
+  hingePaper.polygonOffset = true; hingePaper.polygonOffsetFactor = -2; hingePaper.polygonOffsetUnits = -2;
+  const gutter = mesh(new THREE.PlaneGeometry(1, 1, 24, 24), hingePaper, group, 'folded-endpaper-hinge', 'previous');
+  // The boards and paper volumes supply contact shadows. The thin lining
+  // must not cast duplicate, speckled shadows along its shared boundaries.
+  gutter.castShadow = false;
+  const silks = ['#c5b48e', '#8c4b3e'].map(color => new THREE.MeshStandardMaterial({ color, roughness: .88 }));
+  const threads = [], threadGeometry = new THREE.CylinderGeometry(1, 1, 1, 8);
+  for (const z of [-PAGE_DEPTH / 2 - .005, PAGE_DEPTH / 2 + .005]) for (let i = 0; i < 18; i++) {
+    const thread = mesh(threadGeometry, silks[i % 2], group, 'sewn-headband');
+    thread.castShadow = false; threads.push({ thread, z, i });
   }
   const left = new THREE.Group(); group.add(left);
-  const leftBlock = mesh(createPageBlock(), materials.edges, left, 'left-paper-block', 'previous'); leftBlock.scale.x = -1;
-  const rightBlock = mesh(createPageBlock(), materials.edges, group, 'right-paper-block', 'next');
-  const leftPage = mesh(createLeafGeometry(), materials.paper[1], left, 'blank-left-page', 'previous');
-  const rightPage = mesh(createLeafGeometry(), materials.paper[0], group, 'blank-right-page', 'next');
-  // The stack casts the resting sheets' outline; only the free turning leaf
-  // needs a separate shadow, avoiding doubled shadows at a paper-thin offset.
-  leftPage.castShadow = rightPage.castShadow = false;
+  const leftBlock = mesh(createPageBlock(), [materials.paper[1], materials.edges], left, 'left-paper-block', 'previous'); leftBlock.scale.x = -1;
+  const rightBlock = mesh(createPageBlock(), [materials.paper[0], materials.edges], group, 'right-paper-block', 'next');
   const turning = mesh(createLeafGeometry(), materials.paper[0], group, 'curling-paper-leaf', 'busy');
   turning.visible = false;
   let lastLeft = -1, lastRight = -1, lastOpen = -1;
@@ -80,42 +70,92 @@ export async function createBook(surfaceY) {
     const openness = motion.openness;
     front.rotation.z = openness * Math.PI;
     front.position.y = THREE.MathUtils.lerp(CLOSED_HINGE, OPEN_HINGE, openness);
-    spine.scale.x = bands.scale.x = 1 - openness * .24;
-    spine.scale.y = bands.scale.y = 1 - openness * .90;
-    spine.position.y = bands.position.y = OPEN_HINGE * openness * .90;
+    front.position.x = -JOINT * openness; back.position.x = JOINT * openness;
+    if (openness !== lastOpen) {
+      updateSpineGeometry(spine.geometry, openness);
+      for (const fillet of fillets) updateSpineFillet(fillet.mesh.geometry, fillet.z, openness);
+    }
     const turn = motion.phase === 'turning';
     const leftCount = motion.page - (turn && motion.direction < 0 ? 1 : 0);
     const rightCount = LEAF_COUNT - motion.page - (turn && motion.direction > 0 ? 1 : 0);
-    leftBlock.visible = leftPage.visible = leftCount > 0;
-    rightBlock.visible = rightPage.visible = rightCount > 0;
+    leftBlock.visible = leftCount > 0;
+    rightBlock.visible = rightCount > 0;
     if (leftCount !== lastLeft || openness !== lastOpen) {
       sizePageBlock(leftBlock.geometry, leftCount, openness);
-      bendLeaf(leftPage.geometry, 1, PAGE_BASE + leftCount * SHEET_STEP + .001, openness);
-      leftPage.material = materials.paper[Math.max(0, leftCount - 1) % 3]; lastLeft = leftCount;
+      leftBlock.material[0] = materials.paper[Math.max(0, leftCount - 1) % 3]; lastLeft = leftCount;
     }
     if (rightCount !== lastRight || openness !== lastOpen) {
       sizePageBlock(rightBlock.geometry, rightCount, openness);
-      bendLeaf(rightPage.geometry, 0, PAGE_BASE + rightCount * SHEET_STEP + .001, openness);
-      rightPage.material = materials.paper[motion.page % 3]; lastRight = rightCount;
+      rightBlock.material[0] = materials.paper[motion.page % 3]; lastRight = rightCount;
     }
     lastOpen = openness;
     // A gathered left-hand stack returns with the board when closing. It
     // settles above the remaining right-hand pages, then resets under cover.
+    left.position.x = -.045 * openness; rightBlock.position.x = .045 * openness;
     left.rotation.z = (openness - 1) * Math.PI;
     left.position.y = (1 - openness) * (2 * PAGE_BASE + LEAF_COUNT * SHEET_STEP);
     turning.visible = turn;
     if (turn) {
       const t = motion.turnProgress, eased = t * t * (3 - 2 * t);
       const p = motion.direction > 0 ? eased : 1 - eased;
-      const root = PAGE_BASE + THREE.MathUtils.lerp(LEAF_COUNT - motion.index, motion.index + 1, p) * SHEET_STEP + .002;
-      bendLeaf(turning.geometry, p, root); turning.material = materials.paper[motion.index % 3];
+      const count = THREE.MathUtils.lerp(LEAF_COUNT - motion.index, motion.index + 1, p);
+      turning.position.x = THREE.MathUtils.lerp(.045, -.045, p);
+      bendLeaf(turning.geometry, p, sewnHeight(count) + .0007, 1, count * SHEET_STEP);
+      turning.material = materials.paper[motion.index % 3];
+    }
+    // A real paper fold connects the pastedowns and the sewn page roots.
+    front.updateMatrix(); left.updateMatrix(); back.updateMatrix();
+    const rootAt = (count, side) => count > 0
+      ? new THREE.Vector3(0, sewnHeight(count, openness), 0).applyMatrix4(side < 0 ? left.matrix : rightBlock.matrix)
+      : new THREE.Vector3(.075, (side < 0 ? -1 : 1) * (COVER_THICKNESS / 2 + .001), 0).applyMatrix4(side < 0 ? front.matrix : back.matrix);
+    rightBlock.updateMatrix();
+    const a = rootAt(leftCount, -1), b = rootAt(rightCount, 1);
+    const slope = count => { const p = paperProfile(count, openness); return (p[1].y - p[0].y) / p[1].x; };
+    const m0 = leftCount ? -slope(leftCount) : 0, m1 = rightCount ? slope(rightCount) : 0;
+    // The pasted paper hinge laps very slightly over the gathered sheets.
+    // This seals the cut faces and avoids a subpixel crack at their boundary.
+    const lap = .016 * openness;
+    function foldPoint(t) {
+      const width = b.x - a.x, x = THREE.MathUtils.lerp(a.x - lap, b.x + lap, t), offset = SHEET_STEP * openness;
+      // Keep the lapped ends on the sheets. Start the concave fold only in
+      // the open gutter, so it cannot cut back through a page at the seam.
+      if (width > 0 && x < a.x) return new THREE.Vector3(x, a.y + m0 * (x - a.x) + offset, 0);
+      if (width > 0 && x > b.x) return new THREE.Vector3(x, b.y + m1 * (x - b.x) + offset, 0);
+      const u = width > 0 ? (x - a.x) / width : t, u2 = u * u, u3 = u2 * u;
+      return new THREE.Vector3(x,
+        (2 * u3 - 3 * u2 + 1) * a.y + (u3 - 2 * u2 + u) * m0 * width
+        + (-2 * u3 + 3 * u2) * b.y + (u3 - u2) * m1 * width
+        - .010 * Math.sin(Math.PI * u) ** 2 * openness + offset, 0);
+    }
+    const gp = gutter.geometry.attributes.position, guv = gutter.geometry.attributes.uv;
+    for (let j = 0; j <= 24; j++) for (let i = 0; i <= 24; i++) {
+      // Put vertices exactly on both sewn roots. A triangle spanning a root
+      // would chord across the concave fold and intersect the adjoining sheet.
+      const width = b.x - a.x;
+      const t = width > 0 && i > 0 && i < 24 ? (lap + width * (i - 1) / 22) / (width + 2 * lap) : i / 24;
+      const p = foldPoint(t), vertex = j * 25 + i;
+      gp.setXYZ(vertex, p.x, p.y, (j / 24 - .5) * PAGE_DEPTH);
+      guv.setXY(vertex, .035 * Math.sin(Math.PI * t), 1 - j / 24);
+    }
+    gp.needsUpdate = guv.needsUpdate = true; gutter.geometry.computeVertexNormals(); gutter.geometry.computeBoundingSphere();
+    gutter.visible = openness > .08;
+    const threadPoint = (t, z) => {
+      const closed = new THREE.Vector3(.012 + Math.sin(t * Math.PI) * .012, PAGE_BASE + t * LEAF_COUNT * SHEET_STEP, z);
+      const open = foldPoint(t); open.z = z; open.y += .002;
+      return closed.lerp(open, openness);
+    };
+    for (const { thread, z, i } of threads) {
+      const start = threadPoint(i / 18, z), end = threadPoint((i + 1) / 18, z), direction = end.clone().sub(start);
+      thread.position.copy(start).add(end).multiplyScalar(.5);
+      thread.scale.set(.006, Math.max(.001, direction.length()) * .98, .006);
+      thread.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
     }
     group.updateMatrixWorld(true);
   }
   updateGeometry();
   return {
     group, motion,
-    width: COVER_WIDTH * 2 * group.scale.x, depth: COVER_DEPTH * group.scale.z,
+    width: (COVER_WIDTH + JOINT) * 2 * group.scale.x, depth: COVER_DEPTH * group.scale.z,
     place(viewWidth, portrait) {
       // Keep the corner object within the cropped writing surface on phones.
       group.position.x = portrait ? .15 : Math.min(4.25, Math.max(.15, viewWidth / 2 - COVER_WIDTH * group.scale.x - .35));
@@ -137,23 +177,6 @@ export async function createBook(surfaceY) {
       return group.localToWorld(new THREE.Vector3(x, PAGE_BASE + .30, action === 'toggle' ? 0 : .8));
     },
   };
-}
-
-function spineGeometry() {
-  const p = [], uv = [], indices = [], rows = 32, columns = 16;
-  for (let i = 0; i <= rows; i++) for (let j = 0; j <= columns; j++) {
-    const a = i / rows * Math.PI;
-    p.push(-.015 - Math.sin(a) * .12, .204 + Math.cos(a) * .164, (j / columns - .5) * COVER_DEPTH);
-    uv.push(i / rows, j / columns);
-    if (i < rows && j < columns) {
-      const n = i * (columns + 1) + j, b = n + columns + 1;
-      indices.push(n, b, n + 1, b, b + 1, n + 1);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geometry.setIndex(indices); geometry.computeVertexNormals();
-  return geometry;
 }
 
 function coverTooling(gold) {

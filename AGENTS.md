@@ -5,5 +5,6 @@
 - The current scope is the antique white wooden writing desk, its atmosphere, and a small maroon leather-bound copy of The Tenant of Wildfell Hall near the corner, with blank, aged, turnable pages and a full-screen reading view. Other papers, books, navigation, and personal/project content are future work.
 - Use procedural materials and actual geometry for the desk. Preserve the quiet Victorian/Romantic-inspired character and the clear writing surface.
 - Respect reduced-motion preferences, touch input, and the non-WebGL fallback.
+- Keep the realistic ivory wood grain behind the book in full-screen reading mode, using the same desktop material and room lighting.
 - Visible lettering is limited to the gold cursive “Wildfell Hall” on the desktop and the gold-leaf book title “The Tenant of Wildfell Hall”. Keep the book's pages blank. Do not add headings, captions, monograms, or visible control labels over the desk.
 - Preserve the intricate ivory relief carvings and the ornate light pink carpet beneath the desk.

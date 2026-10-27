@@ -150,7 +150,7 @@ export async function createDesk(renderer) {
   block(.025, .065, .006, 0, -1.31, 3.524, bronze, .004, centre);
   group.add(createCarvings(paint, edge, recess, drawers.map(drawer => drawer.group)), await createEmbossing(DESK.surfaceY, brass, renderer));
   applyWoodCoordinates(group);
-  return { group, writingSurface, drawers };
+  return { group, writingSurface, drawers, surfaceMaterial: wood };
 }
 
 function taperedLeg({ surface }) {
