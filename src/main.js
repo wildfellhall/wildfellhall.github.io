@@ -3,10 +3,11 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { createDesk, createEnvironment, createFloor } from './desk.js';
+import { createDesk, createEnvironment, createFloor, DESK } from './desk.js';
 import { createCarpet } from './ornaments.js';
 import { createDeskInteraction } from './desk-interaction.js';
 import { createControlFrame } from './control-frame.js';
+import { createBook } from './book.js';
 
 const room = document.querySelector('#room'), canvas = document.querySelector('#desk');
 const status = document.querySelector('#render-status');
@@ -50,7 +51,7 @@ async function init() {
   const baseTarget = new THREE.Vector3(0, -2.3, 0);
   const overviewDirection = new THREE.Vector3(0, 22, 17).normalize();
   const detailDirection = new THREE.Vector3(0, 15, 23).normalize();
-  createEnvironment(renderer, scene);
+  let environment = createEnvironment(renderer, scene);
   const hemisphere = new THREE.HemisphereLight('#e9edf1', '#8d7561', .42);
   scene.add(hemisphere);
   const sunlight = new THREE.DirectionalLight('#fff0d6', 3.0);
@@ -78,14 +79,14 @@ async function init() {
   fill.position.set(9, 3, 7); scene.add(fill);
   const rim = new THREE.DirectionalLight('#fff3e3', .45);
   rim.position.set(-2, 6, -8); scene.add(rim);
-  const [desk, carpet] = await Promise.all([createDesk(renderer), createCarpet(renderer)]);
+  const [desk, carpet, book] = await Promise.all([createDesk(renderer), createCarpet(renderer), createBook(DESK.surfaceY)]);
   const controlFrame = await createControlFrame(document.querySelector('.desk-controls')).catch(error => {
     console.warn('Using the still metal frame:', error);
     return null;
   });
   // A room-size carpet keeps the elevated composition on the blush textile.
   carpet.scale.set(1.85, 1, 1.85); carpet.position.z = -3;
-  scene.add(createFloor(), carpet, desk.group);
+  scene.add(createFloor(), carpet, desk.group, book.group);
   renderer.shadowMap.needsUpdate = true;
 
   // Small-scale occlusion makes the carved undercuts read without painting black outlines.
@@ -102,7 +103,7 @@ async function init() {
   let graphicsAvailable = true;
   let currentLight = 0, currentDetail = 0;
   const pointer = new THREE.Vector2(), currentPointer = new THREE.Vector2();
-  const interaction = createDeskInteraction({ canvas, room, camera, desk, status, invalidate, resetView: () => {
+  const interaction = createDeskInteraction({ canvas, room, camera, desk, book, status, invalidate, resetView: () => {
     setDetail(false); pointer.set(0, 0); currentPointer.set(0, 0);
   } });
   const afternoon = new THREE.Color('#fff0d6'), dusk = new THREE.Color('#ffcb94');
@@ -143,12 +144,13 @@ async function init() {
     camera.position.copy(target).addScaledVector(direction, 28);
     camera.lookAt(target); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
     const drawers = interaction.animateDrawers(delta, motionQuery.matches);
-    if (drawers.changed) renderer.shadowMap.needsUpdate = true;
+    const pages = book.animate(delta, motionQuery.matches);
+    if (drawers.changed || pages.changed) renderer.shadowMap.needsUpdate = true;
     composer.render();
     controlFrame?.render(currentLight);
     interaction.projectButtons();
     const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentDetail - desiredDetail) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
-    if (unsettled || drawers.unsettled) invalidate();
+    if (unsettled || drawers.unsettled || pages.unsettled) invalidate();
   }
   room.addEventListener('pointermove', event => {
     if (interaction.dragging || motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
@@ -169,6 +171,9 @@ async function init() {
   });
   canvas.addEventListener('webglcontextrestored', () => {
     graphicsAvailable = true; lastTime = 0;
+    // Environment render targets lose their pixels with the context. Rebuild
+    // the room reflections so the gilt and leather recover with the geometry.
+    environment.dispose(); environment = createEnvironment(renderer, scene);
     renderer.shadowMap.needsUpdate = true; room.classList.add('is-ready');
     interaction.setEnabled(true); document.querySelector('.desk-controls').hidden = false; invalidate();
     status.textContent = 'The writing room is ready.';
@@ -187,4 +192,5 @@ init().then(result => { engine = result; }).catch(error => {
   lightButton.disabled = viewButton.disabled = true;
   document.querySelector('.desk-controls').hidden = true;
   document.querySelector('#drawer-controls').hidden = true;
+  document.querySelector('#book-controls').hidden = true;
 });

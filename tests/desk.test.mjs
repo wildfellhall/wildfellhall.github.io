@@ -28,6 +28,69 @@ async function nextFrame(page) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 
+async function bookPoint(page, action) {
+  const box = await page.locator(`[data-book-action="${action}"]`).boundingBox();
+  return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+}
+
+test('the leather book opens by its geometry, turns blank pages both ways, and closes from the keyboard', async () => {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+  const errors = []; page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  const closed = await bookPoint(page, 'toggle');
+  await page.mouse.move(closed.x, closed.y); await page.mouse.down();
+  await page.mouse.move(closed.x + 30, closed.y + 12, { steps: 3 }); await page.mouse.up();
+  assert.equal(await page.locator('#room').getAttribute('data-book-phase'), 'closed', 'A drag must inspect the desk without opening the book');
+  const cover = await bookPoint(page, 'toggle'); await page.mouse.click(cover.x, cover.y);
+  await page.locator('#room[data-book-phase="open"]').waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Close The Tenant of Wildfell Hall' }).getAttribute('aria-expanded'), 'true');
+  assert.equal((await page.locator('#book-controls').innerText()).trim(), '', 'Book controls must not add visible labels');
+  await page.screenshot({ path: 'test-results/book-open-desktop.png' });
+  const right = await bookPoint(page, 'next'); await page.mouse.click(right.x, right.y);
+  await page.locator('#room[data-book-page="1"]').waitFor();
+  const left = await bookPoint(page, 'previous'); await page.mouse.click(left.x, left.y);
+  await page.locator('#room[data-book-page="0"]').waitFor();
+  await page.getByRole('button', { name: 'Next blank page' }).focus(); await page.keyboard.press('ArrowRight');
+  await page.locator('#room[data-book-page="1"]').waitFor();
+  await page.keyboard.press('ArrowRight'); await page.locator('#room[data-book-page="2"]').waitFor();
+  await page.screenshot({ path: 'test-results/book-pages-desktop.png' });
+  await page.keyboard.press('Escape'); await page.locator('#room[data-book-phase="closed"]').waitFor();
+  assert.equal(await page.locator('#room').getAttribute('data-book-page'), '0');
+  await page.getByRole('button', { name: 'Open The Tenant of Wildfell Hall' }).focus(); await page.keyboard.press('Enter');
+  await page.locator('#room[data-book-phase="open"]').waitFor();
+  assert.deepEqual(await page.locator('.drawer-hotspot').evaluateAll(buttons => buttons.map(button => button.getAttribute('aria-expanded'))), ['false', 'false', 'false']);
+  assert.deepEqual(errors, []); await page.close();
+});
+
+test('touch opens the book and turns pages while pinching remains a zoom gesture', async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  const cover = await bookPoint(page, 'toggle'); await page.touchscreen.tap(cover.x, cover.y);
+  await page.locator('#room[data-book-phase="open"]').waitFor();
+  await page.screenshot({ path: 'test-results/book-open-mobile.png' });
+  const right = await bookPoint(page, 'next'); await page.touchscreen.tap(right.x, right.y);
+  await page.locator('#room[data-book-page="1"]').waitFor();
+  const touch = await page.context().newCDPSession(page);
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 140, y: right.y, id: 0 }, { x: 250, y: right.y, id: 1 }] });
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 95, y: right.y, id: 0 }, { x: 295, y: right.y, id: 1 }] });
+  await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await nextFrame(page);
+  assert.equal(await page.locator('#room').getAttribute('data-book-page'), '1');
+  assert.equal(await page.getByRole('button', { name: 'Zoom out', exact: true }).isEnabled(), true);
+  await page.getByRole('button', { name: 'Close book', exact: true }).tap();
+  await page.locator('#room[data-book-phase="closed"]').waitFor();
+  await page.getByRole('button', { name: 'Reset view' }).tap(); await nextFrame(page);
+  const reopened = await bookPoint(page, 'toggle'); await page.touchscreen.tap(reopened.x, reopened.y);
+  await page.locator('#room[data-book-phase="open"]').waitFor();
+  const next = await bookPoint(page, 'next'); await page.touchscreen.tap(next.x, next.y);
+  await page.locator('#room[data-book-page="1"]').waitFor();
+  const left = await bookPoint(page, 'previous'); await page.touchscreen.tap(left.x, left.y);
+  await page.locator('#room[data-book-page="0"]').waitFor();
+  await page.touchscreen.tap(left.x, left.y); await page.locator('#room[data-book-phase="closed"]').waitFor();
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  await page.close();
+});
+
 test('drawers open independently by clicking their geometry, retain their carvings, and close from the keyboard', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   await page.goto(baseURL);
@@ -101,15 +164,21 @@ test('drawer motion can reverse, reduced motion settles it, and graphics recover
   assert.ok(Math.abs((await drawerPoint(page, 1)).y - start.y) < 1, 'Reduced motion must settle a reversing drawer');
   await page.keyboard.press('Enter'); await nextFrame(page);
   const open = await drawerPoint(page, 1);
+  await page.locator('[data-book-action="toggle"]').evaluate(button => button.click()); await nextFrame(page);
+  await page.locator('[data-book-action="next"]').evaluate(button => button.click()); await nextFrame(page);
+  assert.equal(await page.locator('#room').getAttribute('data-book-page'), '1');
   await page.evaluate(() => {
     window.recoveryExtension = document.querySelector('#desk').getContext('webgl2').getExtension('WEBGL_lose_context');
     window.recoveryExtension.loseContext();
   });
   await page.waitForFunction(() => !document.querySelector('#room').classList.contains('is-ready'));
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
+  assert.equal(await page.locator('#book-controls').isVisible(), false);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   await page.evaluate(() => { window.recoveryExtension.restoreContext(); delete window.recoveryExtension; });
   await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  assert.equal(await page.locator('#room').getAttribute('data-book-phase'), 'open');
+  assert.equal(await page.locator('#room').getAttribute('data-book-page'), '1', 'Graphics recovery must preserve the open book and its current leaf');
   assert.equal(await drawer.getAttribute('aria-expanded'), 'true');
   assert.deepEqual(await drawerPoint(page, 1), open);
   await drawer.focus(); await page.keyboard.press('Enter'); await nextFrame(page);
@@ -229,16 +298,17 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=crest-5$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=book-1$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
+  assert.equal(await page.locator('#book-controls').isVisible(), false);
   assert.equal(await page.locator('#desk').evaluate(canvas => getComputedStyle(canvas).pointerEvents), 'none', 'The inactive canvas must not intercept fallback touch gestures');
   await page.screenshot({ path: 'test-results/fallback.png' });
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=crest-5$/);
+  }), /desk-still-wide\.webp\?v=book-1$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });

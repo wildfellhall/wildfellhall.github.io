@@ -13,14 +13,19 @@
     <main id="room" aria-label="An antique white wooden writing desk">
       <div id="desk-fallback" aria-hidden="true">
         <picture>
-          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=crest-5" />
-          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=crest-5" />
-          <img src="./materials/desk-still.webp?v=crest-5" alt="" fetchpriority="high" />
+          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=book-1" />
+          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=book-1" />
+          <img src="./materials/desk-still.webp?v=book-1" alt="" fetchpriority="high" />
         </picture>
       </div>
       <h1 class="sr-only">Wildfell Hall</h1>
-      <canvas id="desk" aria-describedby="desk-help" aria-label="An elevated view of an antique ivory writing desk, with visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, a brass oval crest with embossed gold script, roses and leaves, and a light pink floral carpet"></canvas>
-      <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space.</p>
+      <canvas id="desk" aria-describedby="desk-help" aria-label="An elevated view of an antique ivory writing desk, with a maroon leather-bound copy of The Tenant of Wildfell Hall, visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, a brass oval crest with embossed gold script, roses and leaves, and a light pink floral carpet"></canvas>
+      <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space. Click the maroon book to open it. Click the right page to turn forward, or the left page to turn back. With the book open, the left and right arrow keys turn pages and Escape closes it. Tab also reaches the book and page controls.</p>
+      <div id="book-controls" role="group" aria-label="The Tenant of Wildfell Hall, blank aged pages" hidden>
+        <button class="book-hotspot" data-book-action="toggle" aria-label="Open The Tenant of Wildfell Hall" aria-expanded="false"></button>
+        <button class="book-hotspot" data-book-action="previous" aria-label="Previous blank page" hidden></button>
+        <button class="book-hotspot" data-book-action="next" aria-label="Next blank page" hidden></button>
+      </div>
       <div id="drawer-controls" role="group" aria-label="Desk drawers" hidden>
         <button class="drawer-hotspot" aria-label="Open left drawer" aria-expanded="false"></button>
         <button class="drawer-hotspot" aria-label="Open centre drawer" aria-expanded="false"></button>
@@ -29,6 +34,14 @@
       <div class="room-vignette" aria-hidden="true"></div>
         <div class="desk-controls" role="group" aria-label="Desk view and lighting" hidden>
           <canvas id="control-frame" aria-hidden="true"></canvas>
+          <button id="book-close" aria-label="Close book" hidden>
+            <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" aria-hidden="true" focusable="false">
+              <path class="icon-wash" d="M9 6h16v22H9q-3-1-3-3V9q0-3 3-3Z"/>
+              <path d="M25 6H10q-4 0-4 4v14q0 4 4 4h15V6ZM6 24q0-3 4-3h15M10 7v13"/>
+              <path class="icon-detail" d="M12 9h10v9H12ZM10 24h12M10 26h12"/>
+              <path d="M5 14H2m0 0 3-3m-3 3 3 3"/>
+            </svg>
+          </button>
           <button id="light-toggle" aria-label="Change to evening light" aria-pressed="false">
             <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" aria-hidden="true" focusable="false">
               <circle class="icon-wash" cx="16" cy="16" r="5.2"/>
@@ -73,7 +86,7 @@
           </button>
         </div>
       <p id="render-status" class="sr-only" role="status" aria-live="polite">Preparing the writing room.</p>
-      <noscript><p class="sr-only">A still version of the writing desk. Enable JavaScript for lighting, zoom, and opening drawers.</p></noscript>
+      <noscript><p class="sr-only">A still version of the writing desk and leather-bound book. Enable JavaScript for lighting, zoom, opening drawers, and turning the book's blank pages.</p></noscript>
     </main>
     <script type="module" src="/src/main.js"></script>
   </body>

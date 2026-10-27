@@ -1,12 +1,16 @@
 import * as THREE from 'three';
+import { LEAF_COUNT } from './book-motion.js';
 
 // The camera stays square to the furniture. Inspection moves within its image
 // plane, so dragging and zooming cannot tip the desk relative to the carpet.
-export function createDeskInteraction({ canvas, room, camera, desk, status, invalidate, resetView }) {
+export function createDeskInteraction({ canvas, room, camera, desk, book, status, invalidate, resetView }) {
   const zoomIn = document.querySelector('#zoom-in'), zoomOut = document.querySelector('#zoom-out');
   const drawerControls = document.querySelector('#drawer-controls');
   const buttons = [...drawerControls.querySelectorAll('button')];
   const names = ['left', 'centre', 'right'];
+  const bookControls = document.querySelector('#book-controls');
+  const bookClose = document.querySelector('#book-close');
+  const bookButtons = [...bookControls.querySelectorAll('button')];
   const pan = new THREE.Vector2(), pointers = new Map(), raycaster = new THREE.Raycaster();
   const pickMeshes = [];
   desk.group.traverse(object => {
@@ -14,7 +18,9 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
     // same picking area without testing every small carved leaf on each move.
     if (object.isMesh && object.name !== 'ivory-relief') pickMeshes.push(object);
   });
-  let zoom = 1, gesture = null, enabled = false, focusedDrawer = null;
+  book.group.traverse(object => { if (object.isMesh && object.userData.bookPick) pickMeshes.push(object); });
+  let zoom = 1, gesture = null, enabled = false, focusedDrawer = null, focusedBook = null;
+  let lastBookPhase = 'closed', lastBookPage = 0;
   const MIN_ZOOM = 1, MAX_ZOOM = 2.8;
   const size = () => canvas.getBoundingClientRect();
   const visible = () => new THREE.Vector2((camera.right - camera.left) / camera.zoom, (camera.top - camera.bottom) / camera.zoom);
@@ -44,15 +50,28 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
   function reset() {
     resetView(); setZoom(1); pan.set(0, 0); invalidate();
   }
-  function hitDrawer(x, y) {
+  function hitTarget(x, y) {
     const rect = size();
     raycaster.setFromCamera(new THREE.Vector2((x - rect.left) / rect.width * 2 - 1, 1 - (y - rect.top) / rect.height * 2), camera);
-    const hit = raycaster.intersectObjects(pickMeshes, false)[0];
+    const hit = raycaster.intersectObjects(pickMeshes.filter(mesh => {
+      for (let object = mesh; object; object = object.parent) if (!object.visible) return false;
+      return true;
+    }), false)[0];
     // Respect occlusion: clicking the top above a closed drawer does nothing.
     for (let object = hit?.object; object; object = object.parent) {
-      if (object.userData.drawerIndex !== undefined) return object.userData.drawerIndex;
+      if (object.userData.bookAction) return `book:${object.userData.bookAction}`;
+      if (object.userData.drawerIndex !== undefined) return `drawer:${object.userData.drawerIndex}`;
     }
-    return -1;
+    return null;
+  }
+  function activateBook(action) {
+    if (!enabled || !book.activate(action)) return;
+    if (!book.motion.opened || action === 'close') bookButtons[0].focus({ preventScroll: true });
+    status.textContent = action === 'next' || action === 'previous'
+      ? 'Turning a blank, aged paper page.' : book.motion.opened
+        ? 'The Tenant of Wildfell Hall is opening. Click the right page to turn forward, or the left to turn back. Press Escape to close.'
+        : 'The Tenant of Wildfell Hall is closing.';
+    invalidate();
   }
   function toggleDrawer(index) {
     if (!enabled) return;
@@ -74,6 +93,16 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
       focusedDrawer = index; invalidate();
     });
   });
+  bookButtons.forEach(button => {
+    button.addEventListener('click', () => activateBook(button.dataset.bookAction));
+    button.addEventListener('focus', () => { focusedBook = button.dataset.bookAction; invalidate(); });
+    button.addEventListener('keydown', event => {
+      if (!['ArrowLeft', 'ArrowRight', 'Escape'].includes(event.key)) return;
+      event.preventDefault();
+      activateBook(event.key === 'Escape' ? 'close' : event.key === 'ArrowRight' ? 'next' : 'previous');
+    });
+  });
+  bookClose.addEventListener('click', () => activateBook('close'));
   zoomIn.addEventListener('click', () => setZoom(zoom * 1.25));
   zoomOut.addEventListener('click', () => setZoom(zoom / 1.25));
   document.querySelector('#view-reset').addEventListener('click', reset);
@@ -94,12 +123,13 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     canvas.setPointerCapture(event.pointerId);
     const multi = pointers.size > 1;
-    gesture = { previous: midpoint(), start: midpoint(), moved: multi, drawer: multi ? -1 : hitDrawer(event.clientX, event.clientY) };
+    gesture = { previous: midpoint(), start: midpoint(), moved: multi, target: multi ? null : hitTarget(event.clientX, event.clientY) };
   });
   canvas.addEventListener('pointermove', event => {
     if (!enabled) return;
     if (!pointers.has(event.pointerId)) {
-      room.classList.toggle('is-drawer-hover', event.pointerType !== 'touch' && hitDrawer(event.clientX, event.clientY) >= 0);
+      const target = hitTarget(event.clientX, event.clientY);
+      room.classList.toggle('is-drawer-hover', event.pointerType !== 'touch' && target !== null && target !== 'book:busy');
       return;
     }
     pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -116,12 +146,15 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
   function release(event, cancelled = false) {
     if (!pointers.has(event.pointerId)) return;
     const click = !cancelled && !gesture.moved && pointers.size === 1;
-    const drawer = gesture.drawer;
+    const target = gesture.target;
     pointers.delete(event.pointerId);
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
-    if (pointers.size) gesture = { previous: midpoint(), start: midpoint(), moved: true, drawer: -1 };
+    if (pointers.size) gesture = { previous: midpoint(), start: midpoint(), moved: true, target: null };
     else { gesture = null; room.classList.remove('is-dragging'); }
-    if (click && drawer >= 0 && hitDrawer(event.clientX, event.clientY) === drawer) toggleDrawer(drawer);
+    if (click && target && hitTarget(event.clientX, event.clientY) === target) {
+      if (target.startsWith('book:')) activateBook(target.slice(5));
+      else toggleDrawer(Number(target.slice(7)));
+    }
   }
   canvas.addEventListener('pointerup', event => release(event));
   canvas.addEventListener('pointercancel', event => release(event, true));
@@ -129,6 +162,12 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
   canvas.addEventListener('pointerleave', () => room.classList.remove('is-drawer-hover'));
   canvas.addEventListener('keydown', event => {
     if (!enabled || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (event.key === 'Escape' || ['Enter', ' '].includes(event.key) ||
+      (book.motion.opened && ['ArrowLeft', 'ArrowRight'].includes(event.key))) {
+      event.preventDefault();
+      activateBook(event.key === 'Escape' ? 'close' : event.key === 'ArrowLeft' ? 'previous' : event.key === 'ArrowRight' ? 'next' : 'toggle');
+      return;
+    }
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', '+', '=', '-', 'Home'].includes(event.key)) return;
     event.preventDefault();
     if (event.key === 'Home') reset();
@@ -144,7 +183,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
   return {
     get dragging() { return pointers.size > 0; },
     setEnabled(value) {
-      enabled = value; drawerControls.hidden = !value;
+      enabled = value; drawerControls.hidden = bookControls.hidden = !value;
       canvas.tabIndex = value ? 0 : -1;
       if (!value) {
         for (const id of pointers.keys()) if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
@@ -160,6 +199,12 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
         if (Math.abs(relative.x - pan.x) > view.x * .425) pan.x = relative.x;
         if (Math.abs(relative.dot(up) - pan.y) > view.y * .40) pan.y = relative.dot(up);
         focusedDrawer = null; clampPan();
+      }
+      if (focusedBook !== null) {
+        const relative = book.anchor(focusedBook).sub(target), view = visible();
+        if (Math.abs(relative.x - pan.x) > view.x * .425) pan.x = relative.x;
+        if (Math.abs(relative.dot(up) - pan.y) > view.y * .40) pan.y = relative.dot(up);
+        focusedBook = null; clampPan();
       }
       target.x += pan.x;
       target.addScaledVector(up, pan.y);
@@ -183,6 +228,28 @@ export function createDeskInteraction({ canvas, room, camera, desk, status, inva
         const point = anchorFor(index).project(camera);
         // Keep invisible keyboard targets inside the viewport. Otherwise Tab
         // can scroll the entire clipped room before focus recenters the camera.
+        button.style.left = `${THREE.MathUtils.clamp((point.x + 1) * rect.width / 2, 26, rect.width - 26)}px`;
+        button.style.top = `${THREE.MathUtils.clamp((1 - point.y) * rect.height / 2, 26, rect.height - 26)}px`;
+      });
+      const { motion } = book;
+      if (motion.phase !== lastBookPhase || motion.page !== lastBookPage) {
+        if (motion.phase === 'open') status.textContent = `The book is open. ${motion.page} of ${LEAF_COUNT} blank leaves turned. Use the left and right pages or arrow keys to turn pages, and Escape to close.`;
+        if (motion.phase === 'closed') status.textContent = 'The Tenant of Wildfell Hall is closed.';
+        lastBookPhase = motion.phase; lastBookPage = motion.page;
+      }
+      room.dataset.bookOpen = String(motion.opened);
+      room.dataset.bookPage = String(motion.page); room.dataset.bookPhase = motion.phase;
+      bookControls.setAttribute('aria-busy', String(motion.busy));
+      bookClose.hidden = !motion.opened;
+      bookButtons.forEach(button => {
+        const action = button.dataset.bookAction;
+        button.hidden = action !== 'toggle' && !motion.opened;
+        button.disabled = action !== 'toggle' && (motion.busy || (action === 'next' ? motion.page >= LEAF_COUNT : motion.page === 0));
+        if (action === 'toggle') {
+          button.setAttribute('aria-expanded', String(motion.opened));
+          button.setAttribute('aria-label', `${motion.opened ? 'Close' : 'Open'} The Tenant of Wildfell Hall`);
+        }
+        const point = book.anchor(action).project(camera);
         button.style.left = `${THREE.MathUtils.clamp((point.x + 1) * rect.width / 2, 26, rect.width - 26)}px`;
         button.style.top = `${THREE.MathUtils.clamp((1 - point.y) * rect.height / 2, 26, rect.height - 26)}px`;
       });
