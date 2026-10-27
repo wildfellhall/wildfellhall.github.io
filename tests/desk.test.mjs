@@ -116,6 +116,7 @@ test('drawer motion can reverse, reduced motion settles it, and graphics recover
   assert.equal(await drawer.getAttribute('aria-expanded'), 'false');
   // Losing the small frame context must leave the desk and its controls usable.
   await page.locator('.desk-controls.has-metal-frame').waitFor();
+  await nextFrame(page);
   const frameBefore = await page.locator('#control-frame').evaluate(canvas => canvas.toDataURL());
   await page.evaluate(() => {
     window.frameRecoveryExtension = document.querySelector('#control-frame').getContext('webgl2').getExtension('WEBGL_lose_context');
@@ -228,7 +229,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=crest-3$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=crest-4$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   assert.equal(await page.locator('#desk').evaluate(canvas => getComputedStyle(canvas).pointerEvents), 'none', 'The inactive canvas must not intercept fallback touch gestures');
@@ -237,7 +238,7 @@ test('browsers without WebGL show the matching still desk', async () => {
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=crest-3$/);
+  }), /desk-still-wide\.webp\?v=crest-4$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });

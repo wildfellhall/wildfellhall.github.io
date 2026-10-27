@@ -3,17 +3,18 @@ import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { desktopOutline, perimeterFrame, legProfile } from './furniture-profiles.js';
 import { createNameCrestMetalwork, crestFieldHeight, crestFieldGradient } from './name-crest.js';
+import { crestContactTexture } from './crest-contact.js';
 
-export async function createEmbossing(surfaceY, brass) {
-  const svg = await new SVGLoader().loadAsync(`${import.meta.env.BASE_URL}ornaments/wildfell-hall.svg?v=roundhand-1`);
+export async function createEmbossing(surfaceY, brass, renderer) {
+  const svg = await new SVGLoader().loadAsync(`${import.meta.env.BASE_URL}ornaments/wildfell-hall.svg?v=imperial-1`);
   const geometry = new THREE.ExtrudeGeometry(svg.paths.flatMap(path => SVGLoader.createShapes(path)), {
-    depth: 4, bevelEnabled: true, bevelThickness: .8, bevelSize: .32, bevelSegments: 5, curveSegments: 28,
+    depth: 4, bevelEnabled: true, bevelThickness: .6, bevelSize: .40, bevelSegments: 6, curveSegments: 28,
   });
   geometry.computeBoundingBox();
   const box = geometry.boundingBox, center = box.getCenter(new THREE.Vector3());
-  const scale = 2.95 / (box.max.x - box.min.x);
+  const scale = 2.90 / (box.max.x - box.min.x);
   geometry.translate(-center.x, -center.y, 0);
-  geometry.scale(scale, -scale, .022 / 4);
+  geometry.scale(scale, -scale, .038 / 4);
   reverseWinding(geometry); geometry.computeVertexNormals();
   // The embossing follows the slight crown of the metal field; its lower
   // bevel remains embedded across every letter, without floating edges.
@@ -28,14 +29,19 @@ export async function createEmbossing(surfaceY, brass) {
     normal.set(normal.x - gradient.x * normal.z, normal.y - gradient.y * normal.z, normal.z).normalize();
     normals.setXYZ(i, normal.x, normal.y, normal.z);
   }
-  const face = brass.clone(); face.color.set('#f2d995'); face.metalness = .95; face.roughness = .30;
-  const bevel = brass.clone(); bevel.color.set('#bb9857'); bevel.roughness = .29;
+  const face = brass.clone(); face.color.set('#f2dba6'); face.metalness = .84; face.roughness = .31;
+  const bevel = brass.clone(); bevel.color.set('#b58d4d'); bevel.roughness = .34;
   const lettering = new THREE.Mesh(geometry, [face, bevel]);
   lettering.position.z = .001;
   lettering.name = 'burnished-gold-script-with-beveled-edges';
   lettering.castShadow = lettering.receiveShadow = true;
   const crest = createNameCrestMetalwork(brass);
-  crest.add(lettering); crest.rotation.x = -Math.PI / 2;
+  crest.add(lettering);
+  if (renderer) {
+    const field = crest.getObjectByName('worked-metal-field').material;
+    field.aoMap = crestContactTexture(renderer, crest); field.aoMapIntensity = .95;
+  }
+  crest.rotation.x = -Math.PI / 2;
   crest.scale.set(.72, .72, .62);
   // Bed the plaque's back bevel into the timber. The inscription and flowers
   // belong to the same physical object and receive the room's actual light.

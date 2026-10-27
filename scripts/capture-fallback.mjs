@@ -23,6 +23,8 @@ try {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor, reducedMotion: 'reduce' });
     await page.goto(url);
     await page.locator('#room.is-ready').waitFor({ timeout: 60000 });
+    // Let the first rendered frame replace the previous still before capture.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     // Element screenshots include overlapping siblings. Keep controls and the
     // CSS vignette out of the still; the fallback supplies its own vignette.
     await page.addStyleTag({ content: '.desk-controls, .room-vignette { visibility: hidden !important; }' });

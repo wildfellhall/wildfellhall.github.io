@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const FIELD_RX = 2.30, FIELD_RY = .555, FIELD_CROWN = .026;
+const FIELD_RX = 2.30, FIELD_RY = .555, FIELD_CROWN = .010;
 
 export function crestFieldHeight(x, y) {
   const radius = Math.min(1, (x / FIELD_RX) ** 2 + (y / FIELD_RY) ** 2);
-  return .052 + FIELD_CROWN * (1 - radius) ** 2;
+  return .046 + FIELD_CROWN * (1 - radius) ** 2;
 }
 
 export function crestFieldGradient(x, y, target) {
@@ -13,12 +13,35 @@ export function crestFieldGradient(x, y, target) {
   return target.set(-4 * FIELD_CROWN * x / FIELD_RX ** 2 * falloff, -4 * FIELD_CROWN * y / FIELD_RY ** 2 * falloff);
 }
 
+function cellNoise(x, y, seed) {
+  let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + seed;
+  h = Math.imul(h ^ h >>> 13, 1274126177);
+  return ((h ^ h >>> 16) >>> 0) / 4294967296;
+}
+
+function workedHeight(x, y) {
+  const cell = .13, ix = Math.floor(x / cell), iy = Math.floor(y / cell);
+  let indent = 0;
+  for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) {
+    const a = ix + dx, b = iy + dy;
+    const cx = (a + .2 + cellNoise(a, b, 17) * .6) * cell;
+    const cy = (b + .2 + cellNoise(a, b, 83) * .6) * cell;
+    const rx = .040 + cellNoise(a, b, 151) * .024, ry = .042 + cellNoise(a, b, 307) * .025;
+    const d = ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2;
+    indent += (.00065 + cellNoise(a, b, 491) * .00055) * Math.exp(-d * 1.6);
+  }
+  const edge = Math.hypot(x / FIELD_RX, y / FIELD_RY);
+  return crestFieldHeight(x, y) - indent * (1 - THREE.MathUtils.smoothstep(edge, .86, 1));
+}
+
 function crownedField() {
-  const rings = 32, segments = 256, positions = [0, 0, crestFieldHeight(0, 0)], uv = [.5, .5], indices = [];
+  // Shallow, irregular tool impressions are vertices in the metal surface.
+  // They break up reflections in both lighting modes and at every zoom level.
+  const rings = 96, segments = 512, positions = [0, 0, workedHeight(0, 0)], uv = [.5, .5], indices = [];
   for (let ring = 1; ring <= rings; ring++) for (let i = 0; i < segments; i++) {
     const angle = i / segments * Math.PI * 2, r = ring / rings;
     const x = FIELD_RX * r * Math.cos(angle), y = FIELD_RY * r * Math.sin(angle);
-    positions.push(x, y, crestFieldHeight(x, y)); uv.push(x / (FIELD_RX * 2) + .5, y / (FIELD_RY * 2) + .5);
+    positions.push(x, y, workedHeight(x, y)); uv.push(x / (FIELD_RX * 2) + .5, y / (FIELD_RY * 2) + .5);
     const a = 1 + (ring - 1) * segments + i, b = 1 + (ring - 1) * segments + (i + 1) % segments;
     if (ring === 1) indices.push(0, a, b);
     else indices.push(a - segments, a, b - segments, a, b, b - segments);
@@ -39,15 +62,14 @@ function brushedBronze() {
     const grain = seed / 4294967296 - .5;
     const radius = Math.hypot(x / (w - 1) * 2 - 1, y / (h - 1) * 2 - 1);
     const edge = THREE.MathUtils.smoothstep(radius, .82, 1);
-    const brushing = Math.sin(y * 1.81 + Math.sin(x * .013) * .16) * .55 + Math.sin(y * 2.73 + x * .001) * .25;
-    // Directional polishing marks perturb the reflection, not the painted
-    // colour. Oxidation stays in the protected lip of the cast bronze field.
+    const brushing = Math.sin(y * 1.81 + Math.sin(x * .09) * .7) * .35 + Math.sin(y * 2.73 + x * .017) * .18;
+    // Fine polishing remains subordinate to the modelled tool impressions.
     const wear = 1 - edge * .075 + grain * .009;
-    const r = 205 + edge * 20 + brushing * 7 + grain * 9;
+    const r = 188 + edge * 20 + brushing * 7 + grain * 16;
     const i = (y * w + x) * 4;
-    colour.set([166 * wear, 139 * wear, 91 * wear, 255], i);
+    colour.set([142 * wear, 116 * wear, 76 * wear, 255], i);
     roughness.set([r, r, r, 255], i);
-    normal.set([128 + grain * .8, 128 + brushing * 5 + grain, 255, 255], i);
+    normal.set([128 + grain * 2, 128 + brushing * 3 + grain * 2, 255, 255], i);
   }
   const textures = [colour, roughness, normal].map(pixels => {
     const texture = new THREE.DataTexture(pixels, w, h);
@@ -155,23 +177,22 @@ function workedMetal() {
 
 export function createNameCrestMetalwork(brass) {
   const group = new THREE.Group(); group.name = 'oval-floral-name-crest';
-  // The gold relief surrounds a polished bronze field. A conducting surface
-  // and directional reflections keep the inset recognisably metallic.
+  // Cast bronze with a worked ground and burnished relief, all lit by the room.
   const texture = workedMetal(), cast = brass.clone();
   cast.roughnessMap = cast.bumpMap = texture; cast.roughness = .55; cast.bumpScale = .00055;
   const [map, roughnessMap, normalMap] = brushedBronze();
   const satin = new THREE.MeshPhysicalMaterial({ map, roughnessMap, normalMap,
-    metalness: .98, roughness: .24, anisotropy: .40, anisotropyRotation: 0,
-    normalScale: new THREE.Vector2(.20, .20) });
+    metalness: .94, roughness: .47, anisotropy: .12, anisotropyRotation: 0,
+    normalScale: new THREE.Vector2(.28, .28) });
   const burnished = cast.clone(); burnished.roughness = .40;
   function mesh(geometry, material, name) {
     const object = new THREE.Mesh(geometry, material); object.name = name;
     object.castShadow = object.receiveShadow = true; group.add(object); return object;
   }
   const oval = new THREE.Shape(); oval.absellipse(0, 0, 2.40, .66, 0, Math.PI * 2, false);
-  mesh(new THREE.ExtrudeGeometry(oval, { depth: .041, bevelEnabled: true, bevelSize: .012,
+  mesh(new THREE.ExtrudeGeometry(oval, { depth: .024, bevelEnabled: true, bevelSize: .012,
     bevelThickness: .010, bevelSegments: 5, curveSegments: 120 }), cast, 'solid-oval-plaque');
-  mesh(crownedField(), satin, 'gently-crowned-patinated-field');
+  mesh(crownedField(), satin, 'worked-metal-field');
   mesh(ovalMolding(2.35, .61), burnished, 'continuous-oval-molding');
 
   const foliage = [], flowers = [];
