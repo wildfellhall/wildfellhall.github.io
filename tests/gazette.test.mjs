@@ -138,24 +138,45 @@ test('nested newspaper leaves keep their rounded-fold spacing and remain above t
       const p = layers[index].attributes.position, q = layers[index - 1].attributes.position;
       for (let i = 0; i < p.count; i++) {
         const separation = new THREE.Vector3().fromBufferAttribute(p, i).sub(new THREE.Vector3().fromBufferAttribute(q, i));
-        // Remove the deliberate edge stagger, leaving the nested fold gap.
-        const v = base.attributes.uv.getY(i), freeEdge = THREE.MathUtils.smoothstep(Math.abs(v - .48), .10, .32);
-        separation.x -= .012 * freeEdge; separation.z -= .018 * freeEdge;
+        // Slips run along the local tangent; the normal component must
+        // always leave air between the two paper surfaces.
         const normal = new THREE.Vector3().fromBufferAttribute(base.attributes.normal, i);
         assert.ok(separation.dot(normal) > .0055, 'Adjacent paper surfaces must not collapse into each other');
       }
       const mesh = new THREE.Mesh(layers[index], new THREE.MeshBasicMaterial({side: THREE.DoubleSide}));
       mesh.updateMatrixWorld();
-      // Check actual surface clearance across the curved fold, not merely
-      // the distance between corresponding vertices on two shifted grids.
-      for (let row = 43; row <= 60; row += 2) for (let col = 5; col <= 59; col += 9) {
+      // Check the curved fold and broad overlapping faces: displaced cut
+      // edges must not make the surfaces cross between their shifted grids.
+      const rows = [...new Set([...Array.from({length:22}, (_, i) => 8 + i * 4),
+        ...Array.from({length:9}, (_, i) => 43 + i * 2)])];
+      // Stay inside the common overlap; the uneven side margins deliberately
+      // extend beyond their neighbouring sheet.
+      for (const row of rows) for (let col = 8; col <= 56; col += 8) {
         const i = row * 65 + col;
         const origin = new THREE.Vector3().fromBufferAttribute(q, i);
         const direction = new THREE.Vector3().fromBufferAttribute(layers[index - 1].attributes.normal, i);
-        const hit = new THREE.Raycaster(origin, direction, 0, .08).intersectObject(mesh)[0];
-        assert.ok(hit && hit.distance > .003, 'Each nested shoulder stays above the previous leaf');
+        const hit = new THREE.Raycaster(origin, direction, 0, .15).intersectObject(mesh)[0];
+        assert.ok(hit && hit.distance > .003, 'Overlapping paper surfaces must remain separated through the fold');
       }
       mesh.material.dispose();
     }
   }
+});
+
+test('resting cut edges expose multiple sheets, then settle into the open reading stack', () => {
+  const base = createGazetteGeometry(), layers = Array.from({length:4}, () => base.clone());
+  const edgeSpread = openness => {
+    bendGazette(base, openness);
+    layers.forEach((layer, index) => offsetGazetteLayer(layer, base, index, openness));
+    // Measure the central cut edge at both ends, away from corner curls.
+    return [0, 100].map(row => {
+      const ends = layers.map(layer => layer.attributes.position.getZ(row * 65 + 32));
+      return Math.max(...ends) - Math.min(...ends);
+    });
+  };
+  const resting = edgeSpread(0), open = edgeSpread(1);
+  assert.ok(resting.every(spread => spread > .20), 'Gathered leaves must expose a visible step at their cut edges');
+  assert.ok(open.every(spread => spread < .07), 'The loose edge spread must settle when the newspaper opens');
+  for (const layer of layers) layer.dispose();
+  base.dispose();
 });

@@ -418,7 +418,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-3$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-4$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   assert.equal(await page.locator('#book-controls').isVisible(), false);
@@ -428,7 +428,7 @@ test('browsers without WebGL show the matching still desk', async () => {
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=gazette-3$/);
+  }), /desk-still-wide\.webp\?v=gazette-4$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });
@@ -447,6 +447,7 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   await page.route('**/gazette/issues/2026-10-28.txt', route => ++requests === 1
     ? route.fulfill({status: 503, body: 'Unavailable'}) : route.fulfill({body: older, contentType: 'text/plain'}));
   await page.goto(baseURL); await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout }); await nextFrame(page);
+  await page.screenshot({path: 'test-results/gazette-folded-desktop.png'});
   const box = await page.locator('#gazette-hotspot').boundingBox(); await page.mouse.click(box.x + 22, box.y + 22);
   await page.locator('#room[data-gazette-phase="open"]').waitFor();
   assert.equal(await page.locator('#room').getAttribute('data-gazette-reading'), 'false');

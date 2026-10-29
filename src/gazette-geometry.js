@@ -30,13 +30,19 @@ export function bendGazette(geometry, openness) {
       const t = row / ROWS;
       if (row) {
         const v = (row - .5) / ROWS;
-        const shoulder = THREE.MathUtils.smoothstep(v, .49 + .004 * u, .538 + .004 * u);
-        const loose = fold * (Math.PI - .035 - .016 * Math.sin(u * Math.PI)) * shoulder;
+        // The untied bundle holds air in its shoulder. As it opens that
+        // broad bend settles into the much smaller remembered paper crease.
+        const radiusSpan = .048 + .046 * fold;
+        const centre = .514 + .004 * u;
+        const shoulder = THREE.MathUtils.smoothstep(v, centre - radiusSpan / 2, centre + radiusSpan / 2);
+        const loose = fold * (Math.PI - .065 - .024 * Math.sin(u * Math.PI)) * shoulder;
         const cockle = .014 * Math.sin(v * 13 + u * 5) + .006 * Math.sin(v * 31 - u * 8);
         const edgeCurl = .17 * Math.exp(-v * 42) * Math.sin(u * 5 + 1)
           - .20 * Math.exp(-(1 - v) * 37) * Math.sin(u * 4 + .4);
         const creaseMemory = .075 * Math.exp(-(((v - .516) / .03) ** 2)) * Math.sin((v - .516) * 64) * openness;
-        const angle = loose + cockle + edgeCurl + creaseMemory;
+        const cornerCurl = -fold * .065 * THREE.MathUtils.smoothstep(v, .72, 1)
+          * (u ** 5 + .55 * (1 - u) ** 6);
+        const angle = loose + cockle + edgeCurl + creaseMemory + cornerCurl;
         z += Math.cos(angle) * step; y += Math.sin(angle) * step;
       }
       // Small asymmetric deckle and a barely rippled free edge. The paper's
@@ -54,23 +60,32 @@ export function bendGazette(geometry, openness) {
   p.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingBox(); geometry.computeBoundingSphere();
 }
 
-// A nested bundle follows the same rounded fold at a measured distance along
-// its normal. Translating flat sheets vertically would make them intersect at
-// the shoulder. Tiny staggered cut edges remain visible when unfolded.
+// Slips are deliberately unequal, like gathered sheets after a tie is
+// removed. They expose paper on both sides instead of making a regular fan.
+const RESTING_SLIPS = [[0, 0], [-.19, -.13], [.14, -.30], [-.09, -.48]];
+
+// Nest continuous sheets around the shoulder, with thin stock and varying
+// air gaps. The broad sheet faces stay close; the fold and free edges relax.
 export function offsetGazetteLayer(target, source, layer, openness) {
   const p = target.attributes.position, base = source.attributes.position, normals = source.attributes.normal;
-  const separation = .0065 * layer, point = new THREE.Vector3(), normal = new THREE.Vector3();
+  const resting = (1 - openness) ** 2, point = new THREE.Vector3(), normal = new THREE.Vector3();
+  const slip = new THREE.Vector3(), [restX, restZ] = RESTING_SLIPS[layer % RESTING_SLIPS.length];
   for (let i = 0; i < p.count; i++) {
     point.fromBufferAttribute(base, i); normal.fromBufferAttribute(normals, i);
-    point.addScaledVector(normal, separation);
     const u = source.attributes.uv.getX(i), v = source.attributes.uv.getY(i);
-    // Let the free cut edges fan out, but keep the gathered shoulder aligned.
-    // Sliding whole sheets along z would make adjacent folds cross each other.
     const freeEdge = THREE.MathUtils.smoothstep(Math.abs(v - .48), .10, .32);
-    point.x += layer * .012 * freeEdge;
-    point.z += layer * .018 * freeEdge;
-    // The cut corners relax independently without separating the fold.
-    point.y += layer * .0005 * Math.sin(u * 8 + v * 6) * openness * freeEdge;
+    const shoulder = Math.exp(-(((v - .484) / .095) ** 2));
+    const side = Math.abs(u * 2 - 1) ** 5;
+    let curl = 0;
+    for (let gap = 1; gap <= layer; gap++) curl += .35 + .65 * Math.sin(u * 3 + gap * .7) ** 2;
+    const separation = .0065 * layer + resting * (layer * (.027 * shoulder + .014 * side)
+      + (.026 * curl + .021 * layer * side) * freeEdge);
+    point.addScaledVector(normal, separation);
+    // Slide in the sheet's tangent plane. A world-space translation would
+    // cut through the next sheet on the slope approaching the folded edge.
+    slip.set((layer * .012 + resting * restX) * freeEdge, 0,
+      (layer * .018 + resting * restZ) * freeEdge);
+    slip.addScaledVector(normal, -slip.dot(normal)); point.add(slip);
     p.setXYZ(i, point.x, point.y, point.z);
   }
   p.needsUpdate = true; target.computeVertexNormals(); target.computeBoundingBox(); target.computeBoundingSphere();

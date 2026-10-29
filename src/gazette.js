@@ -51,6 +51,9 @@ export async function createGazette(surfaceY, maxTextureSize = 4096) {
       const printedPage = Math.min(printing.pages.length - 1, leaves.length - index - 1);
       leaf.front.material = printing.get(index === leaves.length - 1 ? page : printedPage, false, index !== leaves.length - 1);
       leaf.front.material.side = THREE.FrontSide;
+      // A single paper surface must block the window light from either side
+      // as its loose upper flap folds over the leaves underneath.
+      leaf.front.material.shadowSide = THREE.DoubleSide;
       leaf.back.material = printing.get(index === 0 ? 0 : printedPage, true, index !== 0);
       leaf.back.material.side = THREE.BackSide;
     }
