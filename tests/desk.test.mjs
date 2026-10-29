@@ -438,7 +438,7 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   const original = await readFile('public/gazette/issues/2026-10-29.txt', 'utf8');
-  const older = original.replaceAll('2026-10-29', '2026-10-28').replace(/\[article-1\]\ntitle:\n(?:subtitle:\n)?byline:[^\n]*\n/,
+  const older = original.replaceAll('2026-10-29', '2026-10-28').replace(/\[article-1\]\ntitle:[^\n]*\n(?:subtitle:[^\n]*\n)?byline:[^\n]*\n/,
     '[article-1]\ntitle: An archived letter\nsubtitle: From the reading room\nbyline: A reader\n\n' + 'An entirely editable newspaper article. '.repeat(160) + '\n\n');
   await page.route('**/gazette/index.json', route => route.fulfill({json: [
     { date: '2026-10-29', label: '29 October 2026' }, { date: '2026-10-28', label: '28 October 2026' },
@@ -451,6 +451,7 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   const box = await page.locator('#gazette-hotspot').boundingBox(); await page.mouse.click(box.x + 22, box.y + 22);
   await page.locator('#room[data-gazette-phase="open"]').waitFor();
   assert.equal(await page.locator('#room').getAttribute('data-gazette-reading'), 'false');
+  assert.equal(await page.locator('#room').getAttribute('data-gazette-page'), '1', 'Unfolding must reveal the inside, not repeat the outside cover');
   assert.equal(await page.locator('#gazette-transcript h3').count(), 6);
   const suppliedBylines = [...original.matchAll(/^byline: *(.+)$/gm)].map(match => match[1]);
   assert.deepEqual(await page.locator('#gazette-transcript p').allTextContents(), suppliedBylines, 'Preserve supplied bylines without inventing article prose');
@@ -460,6 +461,11 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   assert.equal(await page.evaluate(() => [...document.fonts].filter(face => face.status === 'loaded' && face.family.includes('Gazette')).length), 4);
   await page.screenshot({path: 'test-results/gazette-reader-desktop.png'});
   assert.equal(await page.locator('#room').getAttribute('data-gazette-pages'), '4');
+  assert.equal(await page.locator('#room').getAttribute('data-gazette-page'), '1', 'Reading view must preserve the unfolded page');
+  await page.getByRole('button', {name: 'Previous Gazette sheet'}).click();
+  await page.locator('#room[data-gazette-page="0"]').waitFor();
+  assert.equal(await page.getByRole('button', {name: 'Previous Gazette sheet'}).isDisabled(), true);
+  await page.screenshot({path: 'test-results/gazette-front-page-desktop.png'});
   for (let number = 1; number < 4; number++) {
     await page.getByRole('button', {name: 'Next Gazette sheet'}).click();
     await page.locator(`#room[data-gazette-page="${number}"]`).waitFor();
@@ -478,7 +484,10 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   assert.ok(Number(await page.locator('#room').getAttribute('data-gazette-pages')) > 1);
   assert.match(await page.locator('#gazette-transcript').textContent(), /An archived letter/);
   assert.match(await page.locator('#gazette-transcript').textContent(), /From the reading room/);
+  assert.equal(await page.locator('#room').getAttribute('data-gazette-page'), '1', 'A different issue must also open at its first inside page');
   await page.getByRole('button', {name: 'Next Gazette sheet'}).click();
+  await page.locator('#room[data-gazette-page="2"]').waitFor();
+  await page.locator('#desk').focus(); await page.keyboard.press('ArrowLeft');
   await page.locator('#room[data-gazette-page="1"]').waitFor();
   await page.locator('#desk').focus(); await page.keyboard.press('ArrowLeft');
   await page.locator('#room[data-gazette-page="0"]').waitFor();
@@ -491,6 +500,10 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   assert.equal(await page.locator('#room').getAttribute('data-gazette-date'), '2026-10-28');
   await page.getByRole('button', {name: 'Fold Gazette', exact: true}).click();
   await page.locator('#room[data-gazette-phase="closed"]').waitFor();
+  assert.equal(await page.locator('#room').getAttribute('data-gazette-page'), '0', 'The folded issue displays the outside cover');
+  const folded = await page.locator('#gazette-hotspot').boundingBox();
+  await page.mouse.click(folded.x + 22, folded.y + 22);
+  await page.locator('#room[data-gazette-phase="open"][data-gazette-page="1"]').waitFor();
   assert.deepEqual(errors, []); await page.close();
 });
 
@@ -501,6 +514,7 @@ test('touch unfolds the loose Gazette, enters reading only with its control, and
   const box = await page.locator('#gazette-hotspot').boundingBox(); await page.touchscreen.tap(box.x + 22, box.y + 22);
   await page.locator('#room[data-gazette-phase="open"]').waitFor();
   assert.equal(await page.locator('#room').getAttribute('data-gazette-reading'), 'false');
+  assert.equal(await page.locator('#room').getAttribute('data-gazette-page'), '1');
   await page.getByRole('button', {name: 'Read Gazette full screen', exact: true}).tap();
   await page.locator('#room[data-gazette-reading="true"]').waitFor();
   await page.screenshot({path: 'test-results/gazette-reader-mobile.png'});
@@ -532,6 +546,46 @@ test('the Gazette date archive and readable sections work without WebGL', async 
   assert.equal(await page.locator('#gazette-archive').evaluate(dialog => dialog.classList.contains('has-metal-frame')), false);
   await page.screenshot({path: 'test-results/gazette-archive-fallback.png'});
   await page.keyboard.press('Escape'); assert.equal(await page.locator('#gazette-archive').isVisible(), false);
+  await page.close();
+});
+
+test('Gazette printed outside and inside faces stay distinct through opening, reading and refolding', async () => {
+  const page = await browser.newPage();
+  await page.route(baseURL, route => route.fulfill({contentType: 'text/html', body: '<!doctype html><title>Gazette face proof</title>'}));
+  await page.goto(baseURL);
+  const proof = await page.evaluate(async () => {
+    const THREE = await import('/node_modules/three/build/three.module.js');
+    const { createGazette } = await import('/src/gazette.js');
+    const gazette = await createGazette(0);
+    gazette.group.position.set(0, 0, 0); gazette.group.rotation.set(0, 0, 0); gazette.group.scale.setScalar(1);
+    const faces = gazette.leaves.flatMap(leaf => [leaf.front, leaf.back]);
+    const visible = () => {
+      gazette.group.updateMatrixWorld(true);
+      const ray = new THREE.Raycaster(new THREE.Vector3(0, 10, -1), new THREE.Vector3(0, -1, 0));
+      return ray.intersectObjects(faces)[0].object.material.name;
+    };
+    const states = [{page: gazette.page, face: visible()}];
+    gazette.activate('open'); gazette.animate(0, true);
+    states.push({page: gazette.page, face: visible()});
+    gazette.activate('previous'); gazette.activate('open');
+    states.push({page: gazette.page, face: visible()});
+    gazette.activate('close'); gazette.animate(0, true);
+    states.push({page: gazette.page, face: visible()});
+    gazette.activate('toggle'); gazette.animate(0, true);
+    states.push({page: gazette.page, face: visible()});
+    gazette.activate('next'); gazette.activate('open');
+    states.push({page: gazette.page, face: visible()});
+    return {date: gazette.issue.date, states};
+  });
+  const material = number => `gazette-${proof.date}-${number}`;
+  assert.deepEqual(proof.states, [
+    {page: 0, face: `${material(1)}-reverse`},
+    {page: 1, face: material(2)},
+    {page: 0, face: material(1)},
+    {page: 0, face: `${material(1)}-reverse`},
+    {page: 1, face: material(2)},
+    {page: 2, face: material(3)},
+  ], 'The actual topmost printed mesh must show the cover outside and a different page inside');
   await page.close();
 });
 

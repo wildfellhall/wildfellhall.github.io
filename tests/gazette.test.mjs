@@ -9,14 +9,18 @@ import { gazetteCatalog } from '../scripts/gazette-catalog.mjs';
 import { createGazetteGeometry, bendGazette, offsetGazetteLayer, GAZETTE_DEPTH } from '../src/gazette-geometry.js';
 import { composeGazetteText } from '../src/gazette-composition.js';
 const published = await readFile(new URL('../public/gazette/issues/2026-10-29.txt', import.meta.url), 'utf8');
-const source = published.replace(/^byline:.*$/gm, 'byline:');
+const template = await readFile(new URL('../public/gazette/template.txt', import.meta.url), 'utf8');
+// Editorial changes belong in the published issue; deterministic pagination
+// fixtures come from the blank template, not the user's evolving content.
+const source = template.replace('date: YYYY-MM-DD', 'date: 2026-10-29')
+  .replace(/^number:$/m, 'number: 1').replace(/^subtitle:\n/gm, '');
 
-test('first issue preserves supplied metadata and six empty prose sections, with a real date', async () => {
+test('published issue parses and the editable template starts empty, with validated real dates', () => {
   const issue = parseGazette(published, '2026-10-29');
-  assert.equal(issue.number, '1'); assert.equal(issue.sections.length, 6);
-  assert.ok(issue.sections.every(section => !section.title && !section.body));
-  const template = (await readFile(new URL('../public/gazette/template.txt', import.meta.url), 'utf8')).replace('date: YYYY-MM-DD', 'date: 2028-02-29');
-  assert.equal(parseGazette(template).date, '2028-02-29');
+  assert.equal(issue.sections.length, 6);
+  const empty = parseGazette(template.replace('date: YYYY-MM-DD', 'date: 2028-02-29'));
+  assert.equal(empty.date, '2028-02-29');
+  assert.ok(empty.sections.every(section => !section.title && !section.subtitle && !section.byline && !section.body));
   for (const date of ['2026-02-29', '2026-13-01', '2026-00-00', 'today', '0000-01-01']) assert.equal(validDate(date), false);
   assert.throws(() => parseGazette(source, '2026-10-30'), /filename/);
   assert.throws(() => parseGazette(source.replace('[article-2]', '[article-1]')), /repeated/);
