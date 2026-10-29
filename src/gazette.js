@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createGazetteGeometry, bendGazette, createLooseTwine, GAZETTE_WIDTH, GAZETTE_DEPTH } from './gazette-geometry.js';
+import { createGazetteGeometry, bendGazette, offsetGazetteLayer, createGazetteEdge, createLooseTwine, GAZETTE_WIDTH, GAZETTE_DEPTH } from './gazette-geometry.js';
 import { createGazettePrinting, loadGazetteFonts } from './gazette-print.js';
 import { parseGazette, dateLabel } from './gazette-text.js';
 
@@ -25,36 +25,42 @@ export async function createGazette(surfaceY, maxTextureSize = 4096) {
   const group = new THREE.Group(); group.name = 'wildfell-gazette';
   group.position.set(-3.9, surfaceY + .007, .25); group.rotation.y = .105; group.scale.setScalar(.86);
   const geometry = createGazetteGeometry();
-  const front = new THREE.Mesh(geometry, printing.get(0)); front.name = 'continuous-folded-newspaper';
-  front.material.side = THREE.FrontSide; front.castShadow = front.receiveShadow = true;
-  const back = new THREE.Mesh(geometry, printing.get(0, true)); back.name = 'printed-newspaper-reverse';
-  back.material.side = THREE.BackSide; back.receiveShadow = true;
-  front.userData.gazettePick = back.userData.gazettePick = true;
-  group.add(front, back);
-  // Thin, uneven cut edge follows the very same boundary as both paper faces.
-  const edgeMaterial = new THREE.MeshStandardMaterial({ color: '#d4c8aa', roughness: 1 });
-  let edge;
-  function updateEdge() {
-    const p = geometry.attributes.position, boundary = [], cols = 65, rows = 101;
-    for (let x = 0; x < cols; x++) boundary.push(x);
-    for (let y = 1; y < rows; y++) boundary.push(y * cols + cols - 1);
-    for (let x = cols - 2; x >= 0; x--) boundary.push((rows - 1) * cols + x);
-    for (let y = rows - 2; y > 0; y--) boundary.push(y * cols);
-    boundary.push(0);
-    const curve = new THREE.CatmullRomCurve3(boundary.map(i => new THREE.Vector3().fromBufferAttribute(p, i)));
-    const g = new THREE.TubeGeometry(curve, boundary.length, .0016, 3, false);
-    if (!edge) { edge = new THREE.Mesh(g, edgeMaterial); group.add(edge); } else { edge.geometry.dispose(); edge.geometry = g; }
+  const edgeMaterial = new THREE.MeshStandardMaterial({ color: '#c2b69d', roughness: 1 });
+  // Four independently shaded leaves (eight exposed faces in the loose fold)
+  // give even an empty edition a real gathered edge. Small textures on the
+  // covered leaves reserve high-resolution ink for the page being read.
+  const leaves = Array.from({length: 4}, (_, index) => {
+    const g = geometry.clone();
+    const front = new THREE.Mesh(g), back = new THREE.Mesh(g);
+    front.name = `gazette-leaf-${index + 1}-recto`; back.name = `gazette-leaf-${index + 1}-verso`;
+    front.castShadow = true; front.receiveShadow = back.receiveShadow = true;
+    front.userData.gazettePick = back.userData.gazettePick = true;
+    const edge = new THREE.Mesh(createGazetteEdge(g), edgeMaterial); edge.name = `gazette-cut-edge-${index + 1}`;
+    group.add(front, back, edge); return {geometry: g, front, back, edge};
+  });
+  function updateBundle(openness) {
+    bendGazette(geometry, openness);
+    for (const [index, leaf] of leaves.entries()) {
+      offsetGazetteLayer(leaf.geometry, geometry, index, openness);
+      leaf.edge.geometry.dispose(); leaf.edge.geometry = createGazetteEdge(leaf.geometry);
+    }
   }
-  updateEdge();
+  function assignBundle() {
+    for (const [index, leaf] of leaves.entries()) {
+      const printedPage = Math.min(printing.pages.length - 1, leaves.length - index - 1);
+      leaf.front.material = printing.get(index === leaves.length - 1 ? page : printedPage, false, index !== leaves.length - 1);
+      leaf.front.material.side = THREE.FrontSide;
+      leaf.back.material = printing.get(index === 0 ? 0 : printedPage, true, index !== 0);
+      leaf.back.material.side = THREE.BackSide;
+    }
+    printing.prune(page);
+  }
   const twine = createLooseTwine(); group.add(twine); twine.position.set(2.8, 0, -.9); twine.rotation.y = -.3;
   let opened = false, progress = 0, page = 0, loading = false;
-  function assignPage(index) {
-    page = index;
-    front.material = printing.get(page); front.material.side = THREE.FrontSide;
-    back.material = printing.get(page, true); back.material.side = THREE.BackSide;
-  }
+  function assignPage(index) { page = index; assignBundle(); }
+  assignBundle(); updateBundle(0);
   return {
-    group, twine, catalog,
+    group, twine, catalog, leaves,
     width: GAZETTE_WIDTH * .86, depth: GAZETTE_DEPTH * .86,
     get issue() { return issue; }, get opened() { return opened; }, get progress() { return progress; },
     get page() { return page; }, get pageCount() { return printing.pages.length; }, get loading() { return loading; },
@@ -93,7 +99,7 @@ export async function createGazette(surfaceY, maxTextureSize = 4096) {
       const target = opened ? 1 : 0, before = progress;
       progress = reducedMotion ? target : THREE.MathUtils.lerp(progress, target, 1 - Math.exp(-delta * 4.5));
       if (Math.abs(progress - target) < .001) progress = target;
-      if (progress !== before) { bendGazette(geometry, progress); updateEdge(); group.updateMatrixWorld(true); }
+      if (progress !== before) { updateBundle(progress); group.updateMatrixWorld(true); }
       return { changed: progress !== before, unsettled: progress !== target };
     },
     anchor() {
@@ -109,6 +115,7 @@ export function issueTranscript(issue, target) {
   for (const section of issue.sections) {
     const article = document.createElement('section'), title = document.createElement('h3');
     title.textContent = section.title || section.label; article.append(title);
+    if (section.subtitle) { const subtitle = document.createElement('p'); subtitle.textContent = section.subtitle; article.append(subtitle); }
     if (section.byline) { const byline = document.createElement('p'); byline.textContent = section.byline; article.append(byline); }
     for (const text of section.body.split(/\n\s*\n/).filter(Boolean)) { const p = document.createElement('p'); p.textContent = text; article.append(p); }
     target.append(article);

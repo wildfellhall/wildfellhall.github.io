@@ -17,6 +17,14 @@ https://ncse.ac.uk/static/media/periodicals/101-CLD-1851-01-04-001-SINGLE/Pg001_
 Studied: blackletter masthead with flourishes, dated issue line, compact
 article headings, three-column composition and uneven letterpress impressions.
 
+The Leader, 4 January 1851, page 2.
+https://ncse.ac.uk/periodicals/l/issues/cld_04011851/page/2/
+Reference scan viewed:
+https://ncse.ac.uk/static/media/periodicals/101-CLD-1851-01-04-001-SINGLE/Pg002_8Ddiqj0.png
+Studied: running title and folio, justified narrow columns, contrasting
+headlines and subheads, printer's rules and uneven oil-based ink impressions.
+The revised Gazette also uses contents leaders and numbered continuations.
+
 The Gazette blends these visual traditions; it is not a facsimile of either
 publication. Publication dates are real contemporary dates. Its house and
 botanical vignette are original code-drawn linework; reference scans are not
@@ -25,6 +33,9 @@ Empty editorial sections contain no invented articles or imitation body text.
 
 Typefaces (modern revivals, locally bundled):
 UnifrakturMaguntia — ornamental blackletter masthead.
-Libre Baskerville — newspaper body and headlines.
+Old Standard TT — newspaper body, italic decks, and bold serif headlines;
+a revival of the Modern/classicist printing types of the later 19th century.
+https://github.com/google/fonts/blob/main/ofl/oldstandardtt/DESCRIPTION.en_us.html
+Libre Baskerville remains used for the book's gold-leaf title.
 TT2020 Style E — the book's varied typewriter impressions.
 Their SIL Open Font License files are included in /ornaments/.

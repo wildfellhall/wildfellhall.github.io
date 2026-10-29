@@ -418,7 +418,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-1$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-2$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   assert.equal(await page.locator('#book-controls').isVisible(), false);
@@ -428,7 +428,7 @@ test('browsers without WebGL show the matching still desk', async () => {
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=gazette-1$/);
+  }), /desk-still-wide\.webp\?v=gazette-2$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });
@@ -439,7 +439,7 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   const original = await readFile('public/gazette/issues/2026-10-29.txt', 'utf8');
   const older = original.replaceAll('2026-10-29', '2026-10-28').replace('[article-1]\ntitle:\nbyline:\n',
-    '[article-1]\ntitle: An archived letter\nbyline: A reader\n\n' + 'An entirely editable newspaper article. '.repeat(160) + '\n\n');
+    '[article-1]\ntitle: An archived letter\nsubtitle: From the reading room\nbyline: A reader\n\n' + 'An entirely editable newspaper article. '.repeat(160) + '\n\n');
   await page.route('**/gazette/index.json', route => route.fulfill({json: [
     { date: '2026-10-29', label: '29 October 2026' }, { date: '2026-10-28', label: '28 October 2026' },
   ]}));
@@ -457,6 +457,13 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   await page.locator('#room[data-gazette-reading="true"]').waitFor();
   assert.equal(await page.evaluate(() => [...document.fonts].filter(face => face.status === 'loaded' && face.family.includes('Gazette')).length), 4);
   await page.screenshot({path: 'test-results/gazette-reader-desktop.png'});
+  assert.equal(await page.locator('#room').getAttribute('data-gazette-pages'), '4');
+  for (let number = 1; number < 4; number++) {
+    await page.getByRole('button', {name: 'Next Gazette sheet'}).click();
+    await page.locator(`#room[data-gazette-page="${number}"]`).waitFor();
+  }
+  assert.equal(await page.getByRole('button', {name: 'Next Gazette sheet'}).isDisabled(), true);
+  await page.screenshot({path: 'test-results/gazette-fourth-page.png'});
   await page.getByRole('button', {name: 'Browse Gazette by date'}).click();
   await page.getByRole('button', {name: '28 October 2026', exact: true}).click();
   await page.getByText('This issue could not be loaded. Please try again.', {exact: true}).waitFor();
@@ -466,6 +473,7 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   await page.locator('#room[data-gazette-date="2026-10-28"]').waitFor();
   assert.ok(Number(await page.locator('#room').getAttribute('data-gazette-pages')) > 1);
   assert.match(await page.locator('#gazette-transcript').textContent(), /An archived letter/);
+  assert.match(await page.locator('#gazette-transcript').textContent(), /From the reading room/);
   await page.getByRole('button', {name: 'Next Gazette sheet'}).click();
   await page.locator('#room[data-gazette-page="1"]').waitFor();
   await page.locator('#desk').focus(); await page.keyboard.press('ArrowLeft');

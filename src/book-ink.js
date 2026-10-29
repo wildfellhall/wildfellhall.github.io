@@ -1,5 +1,6 @@
 import typewriterUrl from './assets/fonts/TT2020StyleE-Regular.woff2?url';
 import { TYPE } from './book-text.js';
+import { spreadInk } from './press-ink.js';
 
 // TT2020 Style E by Fredrick R. Brennan, SIL OFL 1.1 (included in public/ornaments).
 // Unmodified upstream font: github.com/ctrlcctrlv/TT2020, commit 0cf038022b1d541381744a8969a58d55110a0a23.
@@ -58,7 +59,7 @@ export function createInkLayer(page, index, scale, paperHeight) {
     p[i + 3] *= pressure * contact * fibreContact;
   }
   ctx.putImageData(ink, 0, 0);
-  return canvas;
+  return spreadInk(canvas, index + 57, scale, .7);
 }
 
 export function createImpressedPaper(base, ink, mirrored) {

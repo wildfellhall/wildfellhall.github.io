@@ -1,15 +1,16 @@
 import * as THREE from 'three';
-import regularUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-400-normal.woff2?url';
-import boldUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-700-normal.woff2?url';
-import italicUrl from '@fontsource/libre-baskerville/files/libre-baskerville-latin-400-italic.woff2?url';
+import regularUrl from '@fontsource/old-standard-tt/files/old-standard-tt-latin-400-normal.woff2?url';
+import boldUrl from '@fontsource/old-standard-tt/files/old-standard-tt-latin-700-normal.woff2?url';
+import italicUrl from '@fontsource/old-standard-tt/files/old-standard-tt-latin-400-italic.woff2?url';
 import mastheadUrl from '@fontsource/unifrakturmaguntia/files/unifrakturmaguntia-latin-400-normal.woff2?url';
 import { createPaperStock, canvasFromMap, paperNoise } from './paper-stock.js';
-import { dateLabel, paginateGazette } from './gazette-text.js';
+import { distressPressInk } from './press-ink.js';
+import { dateLabel, paginateGazette, GAZETTE_TYPE } from './gazette-text.js';
 
-const W = 1400, H = 1900, FACE = '"Gazette Baskerville", serif';
+const W = 1400, H = 1900, FACE = '"Gazette Old Standard", serif';
 export async function loadGazetteFonts() {
   await Promise.all([[regularUrl, '400', 'normal'], [boldUrl, '700', 'normal'], [italicUrl, '400', 'italic']].map(async ([url, weight, style]) => {
-    const face = await new FontFace('Gazette Baskerville', `url("${url}")`, { weight, style }).load(); document.fonts.add(face);
+    const face = await new FontFace('Gazette Old Standard', `url("${url}")`, { weight, style }).load(); document.fonts.add(face);
   }));
   const masthead = await new FontFace('Gazette Fraktur', `url("${mastheadUrl}")`).load(); document.fonts.add(masthead);
 }
@@ -31,8 +32,8 @@ function ornament(ctx, x, y, width) {
 
 // Original pen-and-hatch vignette, informed by the engraved skyline on the
 // Illustrated London News (14 May 1842). No generated or copied raster art.
-function engraving(ctx) {
-  ctx.save(); ctx.translate(700, 354); ctx.scale(1.35, 1.05); ctx.lineWidth = 1.25;
+function engraving(ctx, compact = false) {
+  ctx.save(); ctx.translate(700, compact ? 355 : 354); ctx.scale(compact ? .90 : 1.35, compact ? .64 : 1.05); ctx.lineWidth = 1.25;
   const path = d => ctx.stroke(new Path2D(d));
   for (let i = 0; i < 52; i++) {
     const y = -20 + i * 1.8, extent = Math.sin(i / 52 * Math.PI) * 267;
@@ -79,81 +80,132 @@ function engraving(ctx) {
   ctx.restore();
 }
 
-export function createGazettePrinting(issue, maxTextureSize) {
+function rule(ctx, y, x = 78, width = 1244, heavy = false) {
+  ctx.lineWidth = heavy ? 3.1 : 1.2; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + width, y); ctx.stroke();
+  if (heavy) { ctx.lineWidth = .9; ctx.beginPath(); ctx.moveTo(x, y + 5); ctx.lineTo(x + width, y + 5); ctx.stroke(); }
+}
+function printLine(ctx, text, x, y, width, justify, seed) {
+  const words = text.split(' '), normalSpace = ctx.measureText(' ').width;
+  const extra = justify && words.length > 1 ? (width - ctx.measureText(text).width) / (words.length - 1) : 0;
+  const space = normalSpace + (extra < normalSpace * 2 ? extra : 0);
+  let cursor = x;
+  for (const [i, word] of words.entries()) {
+    ctx.save(); ctx.translate(cursor, y + (paperNoise(i, Math.round(y), seed) - .5) * .65);
+    ctx.rotate((paperNoise(i, 1, seed) - .5) * .0015);
+    ctx.fillText(word, 0, 0); ctx.lineWidth = .32; ctx.strokeText(word, 0, 0); ctx.restore();
+    cursor += ctx.measureText(word).width + space;
+  }
+}
+function pageDesign(ctx, page, issue, count) {
+  ctx.fillStyle = ctx.strokeStyle = '#10120f'; ctx.textAlign = 'center';
+  if (page.front) {
+    ctx.font = '32px "Gazette Fraktur"'; ctx.fillText('The', W / 2, 90);
+    ctx.font = '132px "Gazette Fraktur"'; ctx.fillText('Wildfell Gazette', W / 2, 218);
+    ornament(ctx, 164, 106, 108); ornament(ctx, W - 164, 106, 108);
+    rule(ctx, 251, 78, 1244, true); engraving(ctx, true);
+    ctx.font = `700 21px ${FACE}`;
+    ctx.fillText('ARTICLES', 210, 322); ctx.fillText('LITERATURE', 1190, 322);
+    ctx.font = `italic 22px ${FACE}`;
+    ctx.fillText('Thought a Day', 210, 357); ctx.fillText('Words of the Week', 1190, 357);
+    ornament(ctx, 210, 393, 125); ornament(ctx, 1190, 393, 125);
+    rule(ctx, 428, 78, 1244, true);
+    ctx.font = `700 23px ${FACE}`; ctx.fillText(dateLabel(issue.date).toUpperCase(), W / 2, 467);
+    ctx.textAlign = 'left'; ctx.font = `22px ${FACE}`; if (issue.number) ctx.fillText(`No. ${issue.number}`, 84, 467);
+    ctx.textAlign = 'right'; ctx.fillText(`${count} PAGES`, 1316, 467); rule(ctx, 485);
+    ctx.textAlign = 'center'; ctx.font = `700 21px ${FACE}`; ctx.fillText('CONTENTS OF THIS NUMBER.', W / 2, 524);
+    ctx.font = `21px ${FACE}`;
+    for (const [i, item] of page.contents.entries()) {
+      const x = 92 + i % 3 * 424, y = 560 + Math.floor(i / 3) * 33;
+      let label = item.label;
+      while (ctx.measureText(label).width > 300) label = label.slice(0, -2).trimEnd() + '…';
+      ctx.textAlign = 'left'; ctx.fillText(label, x, y);
+      const left = x + ctx.measureText(label).width + 10, end = x + 354;
+      ctx.save(); ctx.setLineDash([1, 6]); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(left, y - 3); ctx.lineTo(end, y - 3); ctx.stroke(); ctx.restore();
+      ctx.textAlign = 'right'; ctx.fillText(String(item.page), x + 376, y);
+    }
+    rule(ctx, 619, 78, 1244, true);
+    ctx.textAlign = 'center'; ctx.font = `700 22px ${FACE}`; ctx.fillText('ARTICLES & CORRESPONDENCE.', W / 2, 670); rule(ctx, 689);
+  } else {
+    ctx.font = `700 27px ${FACE}`; ctx.fillText('THE WILDFELL GAZETTE.', W / 2, 94);
+    ctx.textAlign = 'left'; ctx.font = `24px ${FACE}`; ctx.fillText(String(page.number), 80, 94);
+    ctx.textAlign = 'right'; ctx.fillText(dateLabel(issue.date).toUpperCase(), 1320, 94); rule(ctx, 116, 78, 1244, true);
+    ctx.textAlign = 'center'; ctx.font = `700 51px ${FACE}`; ctx.fillText(page.name.toUpperCase(), W / 2, 212);
+    ornament(ctx, W / 2, 256, 170); rule(ctx, 284);
+  }
+  for (const [i, story] of page.sections.entries()) {
+    const { x, width, top, bodyY, columnWidth } = story;
+    if (i) {
+      for (const offset of [-26, -22]) { ctx.lineWidth = offset === -26 ? 1.4 : .6; ctx.beginPath(); ctx.moveTo(x + offset, top - 16); ctx.lineTo(x + offset, 1750); ctx.stroke(); }
+    }
+    ctx.textAlign = 'center'; ctx.font = `700 20px ${FACE}`;
+    if (story.title) ctx.fillText(story.label.toUpperCase(), x + width / 2, top + 5);
+    ctx.font = `700 ${story.headline}px ${FACE}`; let y = top + 60;
+    for (const title of story.titles) { ctx.fillText(title.toUpperCase(), x + width / 2, y); y += story.headline + 8; }
+    ctx.font = `italic 27px ${FACE}`;
+    for (const subtitle of story.subtitles) { ctx.fillText(subtitle, x + width / 2, y); y += 33; }
+    ctx.font = `italic 24px ${FACE}`;
+    for (const byline of story.bylines) { ctx.fillText(byline, x + width / 2, y); y += 29; }
+    if (story.continued) { ctx.font = `italic 22px ${FACE}`; ctx.fillText(`Continued from page ${story.previousPage}.`, x + width / 2, y); }
+    rule(ctx, bodyY - 34, x + width * .34, width * .32);
+    ctx.textAlign = 'left'; ctx.font = `${GAZETTE_TYPE.fontSize}px ${FACE}`;
+    for (const [col, lines] of story.columns.entries()) {
+      const cx = x + col * (columnWidth + 36);
+      if (col) { ctx.lineWidth = .9; ctx.beginPath(); ctx.moveTo(cx - 18, bodyY - 6); ctx.lineTo(cx - 18, 1732); ctx.stroke(); }
+      for (const [lineIndex, line] of lines.entries()) {
+        const end = lineIndex === lines.length - 1;
+        const justify = Boolean(line && (end ? story.continues || col < story.columns.length - 1 && story.columns[col + 1].length : lines[lineIndex + 1]));
+        printLine(ctx, line, cx, bodyY + lineIndex * GAZETTE_TYPE.leading, columnWidth, justify, page.number * 73 + col);
+      }
+    }
+    // Short printer's ornaments close an item; the footer gives a real page
+    // destination when the composited article needs another sheet.
+    ctx.textAlign = 'center'; ctx.font = `italic 22px ${FACE}`;
+    if (story.continues) ctx.fillText(`Continued on page ${story.nextPage}.`, x + width / 2, 1760);
+    else { rule(ctx, 1758, x + width * .39, width * .22); ornament(ctx, x + width / 2, 1778, 66); }
+  }
+  rule(ctx, 1810, 78, 1244, true);
+  ctx.textAlign = 'center'; ctx.font = `22px ${FACE}`; ctx.fillText(`— ${page.number} —`, W / 2, 1853);
+}
+
+export function createGazettePrinting(issue, maxTextureSize = 4096) {
   const stock = createPaperStock(41, true), background = canvasFromMap(stock.map), height = canvasFromMap(stock.bumpMap);
-  const measure = canvas().getContext('2d'); measure.font = `24px ${FACE}`;
-  const titleMeasure = canvas().getContext('2d'); titleMeasure.font = `700 30px ${FACE}`;
-  const pages = paginateGazette(issue, s => measure.measureText(s).width, s => titleMeasure.measureText(s).width);
-  const scale = Math.min(2, maxTextureSize / H), cache = new Map();
-  function get(page = 0, reverse = false) {
-    const key = `${page}:${reverse}`; if (cache.has(key)) return cache.get(key);
+  const measure = canvas().getContext('2d'); measure.font = `${GAZETTE_TYPE.fontSize}px ${FACE}`;
+  const titleMeasure = canvas().getContext('2d'); titleMeasure.font = `700 38px ${FACE}`;
+  const pages = paginateGazette(issue, s => measure.measureText(s).width, s => titleMeasure.measureText(s.toUpperCase()).width);
+  const cache = new Map();
+  function get(page = 0, reverse = false, low = false) {
+    const key = `${page}:${reverse}:${low}`; if (cache.has(key)) return cache.get(key);
+    const scale = Math.min(low ? .55 : 2, maxTextureSize / H);
     const ink = canvas(Math.round(W * scale), Math.round(H * scale)), ctx = ink.getContext('2d', { willReadFrequently: true });
-    ctx.scale(scale, scale); ctx.fillStyle = ctx.strokeStyle = '#151612'; ctx.lineWidth = 1;
-    if (reverse) { ctx.translate(0, H); ctx.scale(1, -1); }
-    ctx.textAlign = 'center';
-    ctx.font = '32px "Gazette Fraktur"'; ctx.fillText('The', W / 2, 100);
-    ctx.font = '112px "Gazette Fraktur"'; ctx.fillText('Wildfell Gazette', W / 2, 207);
-    ornament(ctx, 177, 110, 116); ornament(ctx, W - 177, 110, 116);
-    ctx.beginPath(); ctx.moveTo(80, 228); ctx.lineTo(1320, 228); ctx.stroke();
-    engraving(ctx);
-    ctx.lineWidth = 2; ctx.strokeRect(80, 452, 1240, 53);
-    // Cover the short box ends: newspaper rules are horizontal printer's rules.
-    ctx.clearRect(78, 454, 4, 49); ctx.clearRect(1318, 454, 4, 49);
-    ctx.font = `700 19px ${FACE}`; ctx.fillText(dateLabel(issue.date).toUpperCase(), W / 2, 486);
-    ctx.font = `18px ${FACE}`; ctx.textAlign = 'left';
-    if (issue.number) ctx.fillText(`No. ${issue.number}`, 90, 486);
-    ctx.textAlign = 'right'; ctx.fillText(`${page + 1}`, 1308, 486);
-    const sections = pages[page].sections;
-    for (let i = 0; i < sections.length; i++) {
-      const s = sections[i], x = 90 + i % 3 * 420, top = i < 3 ? 552 : 1290;
-      if (i % 3) { ctx.lineWidth = .8; ctx.beginPath(); ctx.moveTo(x - 25, top - 16); ctx.lineTo(x - 25, i < 3 ? 1228 : 1775); ctx.stroke(); }
-      ctx.textAlign = 'center'; ctx.font = `700 30px ${FACE}`;
-      let y = top;
-      for (const title of s.titles) { ctx.fillText(title, x + 185, y, 370); y += 42; }
-      if (s.continued) { ctx.font = `italic 18px ${FACE}`; ctx.fillText('(continued)', x + 185, y); y += 27; }
-      ctx.font = `italic 20px ${FACE}`;
-      for (const byline of s.bylines) { ctx.fillText(byline, x + 185, y); y += 30; }
-      ornament(ctx, x + 185, y + 8, 94); y += 48;
-      ctx.font = `24px ${FACE}`; ctx.textAlign = 'left';
-      ctx.lineWidth = .22;
-      for (const line of s.lines) { ctx.fillText(line, x, y); ctx.strokeText(line, x, y); y += 30; }
-    }
-    ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(80, 1250); ctx.lineTo(1320, 1250); ctx.stroke();
-    ornament(ctx, W / 2, 1831, 195);
-    // Letterpress contact: fine fibre interruptions, inky shoulders, and a
-    // shallow matching indentation, all on the lit paper material itself.
-    const pixels = ctx.getImageData(0, 0, ink.width, ink.height), data = pixels.data;
-    for (let y = 0; y < ink.height; y++) for (let x = 0; x < ink.width; x++) {
-      const i = (y * ink.width + x) * 4; if (!data[i + 3]) continue;
-      const n = paperNoise(x, y, 7), patch = paperNoise(Math.floor(x / 3), Math.floor(y / 3), 11);
-      data[i + 3] *= patch < .025 ? .55 + n * .30 : .91 + n * .09;
-    }
-    ctx.putImageData(pixels, 0, 0);
+    ctx.scale(scale, scale); if (reverse) { ctx.translate(0, H); ctx.scale(1, -1); }
+    pageDesign(ctx, pages[page], issue, pages.length);
+    const impression = distressPressInk(ink, 1871 + page, scale, stock.bumpMap.image);
     const print = canvas(ink.width, ink.height), paint = print.getContext('2d');
     paint.drawImage(background, 0, 0, print.width, print.height);
-    paint.save(); paint.globalAlpha = .16; paint.filter = 'blur(.55px)'; paint.drawImage(ink, 0, 0); paint.restore();
-    paint.drawImage(ink, 0, 0);
-    const relief = canvas(1024, Math.round(1024 * H / W)), rctx = relief.getContext('2d', { willReadFrequently: true });
+    paint.drawImage(impression, 0, 0);
+    const relief = canvas(low ? 512 : 1024, Math.round((low ? 512 : 1024) * H / W)), rctx = relief.getContext('2d', { willReadFrequently: true });
     rctx.drawImage(height, 0, 0, relief.width, relief.height);
     const values = rctx.getImageData(0, 0, relief.width, relief.height);
-    rctx.clearRect(0, 0, relief.width, relief.height); rctx.drawImage(ink, 0, 0, relief.width, relief.height);
+    rctx.clearRect(0, 0, relief.width, relief.height); rctx.drawImage(impression, 0, 0, relief.width, relief.height);
     const coverage = rctx.getImageData(0, 0, relief.width, relief.height).data;
-    for (let i = 0; i < values.data.length; i += 4) for (let c = 0; c < 3; c++) values.data[i + c] -= coverage[i + 3] / 255 * 9;
+    for (let i = 0; i < values.data.length; i += 4) for (let c = 0; c < 3; c++) values.data[i + c] -= coverage[i + 3] / 255 * 12;
     rctx.putImageData(values, 0, 0);
     const material = stock.clone(); material.map = new THREE.CanvasTexture(print); material.map.colorSpace = THREE.SRGBColorSpace;
     material.map.anisotropy = 8; material.normalMap = null; material.bumpMap = new THREE.CanvasTexture(relief);
-    material.bumpScale = .003; material.name = `gazette-${issue.date}-${page + 1}${reverse ? '-reverse' : ''}`;
-    cache.set(key, material);
-    // At most the current and previous sheet's two faces stay on the GPU.
-    for (const [oldKey, old] of cache) {
-      if (cache.size <= 4) break;
-      if (oldKey.startsWith(`${page}:`)) continue;
-      old.map.dispose(); old.bumpMap.dispose(); old.dispose(); cache.delete(oldKey);
-    }
-    return material;
+    material.bumpScale = .003; material.sheen = .025; material.specularIntensity = .09;
+    material.name = `gazette-${issue.date}-${page + 1}${reverse ? '-reverse' : ''}`;
+    cache.set(key, material); return material;
   }
-  return { pages, get, dispose() {
-    for (const material of cache.values()) { material.map.dispose(); material.bumpMap.dispose(); material.dispose(); }
-    for (const key of ['map', 'bumpMap', 'normalMap', 'roughnessMap']) stock[key]?.dispose(); stock.dispose();
-  } };
+  const dispose = material => { material.map.dispose(); material.bumpMap.dispose(); material.dispose(); };
+  return { pages, get,
+    prune(page) {
+      for (const [key, material] of cache) if (!key.endsWith(':true') && key !== `${page}:false:false` && key !== '0:true:false') {
+        dispose(material); cache.delete(key);
+      }
+    },
+    dispose() {
+      for (const material of cache.values()) dispose(material);
+      for (const key of ['map', 'bumpMap', 'normalMap', 'roughnessMap']) stock[key]?.dispose(); stock.dispose();
+    },
+  };
 }

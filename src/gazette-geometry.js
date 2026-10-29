@@ -54,6 +54,39 @@ export function bendGazette(geometry, openness) {
   p.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingBox(); geometry.computeBoundingSphere();
 }
 
+// A nested bundle follows the same rounded fold at a measured distance along
+// its normal. Translating flat sheets vertically would make them intersect at
+// the shoulder. Tiny staggered cut edges remain visible when unfolded.
+export function offsetGazetteLayer(target, source, layer, openness) {
+  const p = target.attributes.position, base = source.attributes.position, normals = source.attributes.normal;
+  const separation = .017 * layer, point = new THREE.Vector3(), normal = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    point.fromBufferAttribute(base, i); normal.fromBufferAttribute(normals, i);
+    point.addScaledVector(normal, separation);
+    const u = source.attributes.uv.getX(i), v = source.attributes.uv.getY(i);
+    // Let the free cut edges fan out, but keep the gathered shoulder aligned.
+    // Sliding whole sheets along z would make adjacent folds cross each other.
+    const freeEdge = THREE.MathUtils.smoothstep(Math.abs(v - .48), .10, .32);
+    point.x += layer * .032 * (.35 + .65 * freeEdge);
+    point.z += layer * .054 * freeEdge;
+    // The cut corners relax independently without separating the fold.
+    point.y += layer * .0012 * Math.sin(u * 8 + v * 6) * openness;
+    p.setXYZ(i, point.x, point.y, point.z);
+  }
+  p.needsUpdate = true; target.computeVertexNormals(); target.computeBoundingBox(); target.computeBoundingSphere();
+}
+
+export function createGazetteEdge(geometry) {
+  const p = geometry.attributes.position, boundary = [], cols = COLS + 1, rows = ROWS + 1;
+  for (let x = 0; x < cols; x++) boundary.push(x);
+  for (let y = 1; y < rows; y++) boundary.push(y * cols + cols - 1);
+  for (let x = cols - 2; x >= 0; x--) boundary.push((rows - 1) * cols + x);
+  for (let y = rows - 2; y > 0; y--) boundary.push(y * cols);
+  boundary.push(0);
+  const curve = new THREE.CatmullRomCurve3(boundary.map(i => new THREE.Vector3().fromBufferAttribute(p, i)));
+  return new THREE.TubeGeometry(curve, boundary.length, .0022, 4, false);
+}
+
 export function createLooseTwine() {
   const group = new THREE.Group(); group.name = 'untied-flax-twine';
   const points = [[-.75, .03, .52], [-.38, .025, .45], [-.30, .03, .07], [-.57, .03, -.28],

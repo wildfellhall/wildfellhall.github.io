@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import * as THREE from 'three';
 import { parseGazette, paginateGazette, validDate, wrapText } from '../src/gazette-text.js';
 import { gazetteCatalog } from '../scripts/gazette-catalog.mjs';
-import { createGazetteGeometry, bendGazette, GAZETTE_DEPTH } from '../src/gazette-geometry.js';
+import { createGazetteGeometry, bendGazette, offsetGazetteLayer, GAZETTE_DEPTH } from '../src/gazette-geometry.js';
 const source = await readFile(new URL('../public/gazette/issues/2026-10-29.txt', import.meta.url), 'utf8');
 
 test('first issue and template contain six empty editable sections, with a real date', async () => {
@@ -22,10 +22,11 @@ test('first issue and template contain six empty editable sections, with a real 
 });
 
 test('plain text accepts paragraphs, literal markup, and editorial metadata without leaking instructions', () => {
-  const text = source.replace('[article-1]\ntitle:\nbyline:\n', '[article-1]\ntitle: A morning letter\nbyline: By A. Reader\n\nFirst paragraph: <script>literal</script>\nwrapped here.\n\nSecond paragraph.\n# An editing note\n');
+  const text = source.replace('[article-1]\ntitle:\nbyline:\n', '[article-1]\ntitle: A morning letter\nsubtitle: Notes from the reading room\nbyline: By A. Reader\n\nFirst paragraph: <script>literal</script>\nwrapped here.\n\nSecond paragraph.\n# An editing note\n');
   const issue = parseGazette(text.replaceAll('\n', '\r\n'));
   assert.equal(issue.sections[0].title, 'A morning letter');
   assert.equal(issue.sections[0].byline, 'By A. Reader');
+  assert.equal(issue.sections[0].subtitle, 'Notes from the reading room');
   assert.match(issue.sections[0].body, /<script>literal<\/script>/);
   assert.doesNotMatch(issue.sections[0].body, /editing note/);
   assert.match(issue.sections[0].body, /\n\nSecond paragraph/);
@@ -35,8 +36,8 @@ test('long Gazette sections continue across sheets without losing words or split
   const issue = parseGazette(source), body = Array.from({length:1500}, (_, i) => `word${i}`).join(' ');
   issue.sections[0].body = body;
   const pages = paginateGazette(issue, s => Array.from(s).length * 12, s => s.length * 17);
-  assert.ok(pages.length > 10);
-  assert.equal(pages.flatMap(page => page.sections[0].lines).join(' '), body);
+  assert.ok(pages.length > 4);
+  assert.equal(pages.flatMap(page => page.sections.filter(s => s.id === 'article-1').flatMap(s => s.lines)).join(' '), body);
   assert.equal(pages[1].sections[0].continued, true);
   const unicode = '𝔄é👩'.repeat(80);
   assert.equal(wrapText(unicode, 40, s => Array.from(s).length * 10).join(''), unicode);
@@ -74,5 +75,62 @@ test('loose newspaper fold remains a continuous length-preserving sheet above th
     }
     assert.equal([...edges.values()].filter(n => n === 1).length, 328, 'Only the outside boundary is open; the rounded fold has no seams');
     assert.ok([...edges.values()].every(n => n <= 2));
+  }
+});
+
+
+test('empty editions have four distinct pages with accurate contents and enough room for all headings', () => {
+  const issue = parseGazette(source);
+  const pages = paginateGazette(issue, s => s.length * 12, s => s.length * 19);
+  assert.equal(pages.length, 4);
+  assert.deepEqual(pages.map(p => p.sections.map(s => s.id)), [
+    ['article-1', 'article-2'], ['article-3'], ['thought-a-day', 'words-of-the-week'], ['miscellaneous'],
+  ]);
+  assert.deepEqual(pages[0].contents.map(s => s.page), [1, 1, 2, 3, 3, 4]);
+  assert.ok(pages.every(p => p.sections.every(s => !s.lines.length && s.bodyY < 1700)));
+  issue.sections[0].subtitle = 'An editable subheading for a leading article';
+  issue.sections[0].body = 'Words in an article. '.repeat(900);
+  const expanded = paginateGazette(issue, s => s.length * 12, s => s.length * 19);
+  assert.ok(expanded.length > 4);
+  for (const page of expanded) for (const story of page.sections) {
+    if (story.continues) assert.ok(expanded[story.nextPage - 1].sections.some(next => next.id === story.id && next.continued));
+    if (story.continued) assert.ok(expanded[story.previousPage - 1].sections.some(previous => previous.id === story.id));
+    assert.ok(story.columns.every(column => story.bodyY + column.length * 31 <= 1750));
+  }
+});
+
+test('nested newspaper leaves keep their rounded-fold spacing and remain above the desk', () => {
+  const base = createGazetteGeometry(), layers = Array.from({length:4}, () => base.clone());
+  for (const progress of [0, .15, .5, .8, 1]) {
+    bendGazette(base, progress);
+    layers.forEach((layer, index) => offsetGazetteLayer(layer, base, index, progress));
+    for (const layer of layers) {
+      assert.ok(layer.attributes.position.array.every(Number.isFinite));
+      assert.ok(layer.attributes.normal.array.every(Number.isFinite));
+      for (let i = 0; i < layer.attributes.position.count; i++) assert.ok(layer.attributes.position.getY(i) > 0);
+    }
+    for (let index = 1; index < layers.length; index++) {
+      const p = layers[index].attributes.position, q = layers[index - 1].attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const separation = new THREE.Vector3().fromBufferAttribute(p, i).sub(new THREE.Vector3().fromBufferAttribute(q, i));
+        // Remove the deliberate edge stagger, leaving the nested fold gap.
+        const v = base.attributes.uv.getY(i), freeEdge = THREE.MathUtils.smoothstep(Math.abs(v - .48), .10, .32);
+        separation.x -= .032 * (.35 + .65 * freeEdge); separation.z -= .054 * freeEdge;
+        const normal = new THREE.Vector3().fromBufferAttribute(base.attributes.normal, i);
+        assert.ok(separation.dot(normal) > .015, 'Adjacent paper surfaces must not collapse into each other');
+      }
+      const mesh = new THREE.Mesh(layers[index], new THREE.MeshBasicMaterial({side: THREE.DoubleSide}));
+      mesh.updateMatrixWorld();
+      // Check actual surface clearance across the curved fold, not merely
+      // the distance between corresponding vertices on two shifted grids.
+      for (let row = 43; row <= 60; row += 2) for (let col = 5; col <= 59; col += 9) {
+        const i = row * 65 + col;
+        const origin = new THREE.Vector3().fromBufferAttribute(q, i);
+        const direction = new THREE.Vector3().fromBufferAttribute(layers[index - 1].attributes.normal, i);
+        const hit = new THREE.Raycaster(origin, direction, 0, .08).intersectObject(mesh)[0];
+        assert.ok(hit && hit.distance > .003, 'Each nested shoulder stays above the previous leaf');
+      }
+      mesh.material.dispose();
+    }
   }
 });

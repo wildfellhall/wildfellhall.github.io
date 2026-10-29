@@ -3,13 +3,17 @@
 # Replace the date below with the same real date as the filename.
 # Set the issue number, or leave number: empty to omit it.
 # Keep all six [section-identifiers] exactly as written.
-# Replace title: and byline: values; blank values use the section heading
-# and omit the byline. Write your prose AFTER the empty line below byline:.
+# Replace title:, subtitle: and byline: values. The optional subtitle is
+# printed below the headline. Blank values use the section heading and omit
+# the subtitle and byline. Write your prose AFTER the empty line below byline:.
 # Separate paragraphs with an empty line. Ordinary single line breaks wrap.
 # Lines beginning with # are editing notes and never appear in the paper.
 # All other text is literal: HTML and Markdown are not interpreted.
 # For words of the week, use a separate paragraph per word and definition.
-# Long sections continue on further sheets, reached with the reading arrows.
+# Each issue starts with four pages: two article pages, a literary page,
+# and miscellany. Long articles add continuation pages automatically.
+# The contents strip and continuation references use the actual page numbers.
+# Reading arrows move between pages; no manual page breaks are needed.
 # Save as UTF-8. Commit/push the new file: GitHub Pages rebuilds the date list
 # automatically. No JSON index or JavaScript changes are needed.
 # To edit an existing issue, edit its dated file instead of this template.
@@ -19,25 +23,31 @@ number:
 
 [article-1]
 title:
+subtitle:
 byline:
 
 [article-2]
 title:
+subtitle:
 byline:
 
 [article-3]
 title:
+subtitle:
 byline:
 
 [thought-a-day]
 title:
+subtitle:
 byline:
 
 [words-of-the-week]
 title:
+subtitle:
 byline:
 
 [miscellaneous]
 title:
+subtitle:
 byline:
 
