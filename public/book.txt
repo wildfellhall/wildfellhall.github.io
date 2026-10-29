@@ -6,3 +6,4 @@
 # Pages are added automatically; you do not need to count or size them.
 # To update the website, commit this file and push to main on GitHub.
 # These instructions can stay here. Until you add text, the pages stay blank.
+Hi! My name is Sanah Rajesh (Wildfell Hall on Github and Hugging Face) and I'm a teenage developer, designer, and general hobbyist interested in AI, machine learning, mechanistic interpretability, language/linguistics, writing, reading, philosophy, and enhancing literary education and literacy. 
