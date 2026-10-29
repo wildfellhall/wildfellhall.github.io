@@ -7,6 +7,9 @@ import { createServer } from 'vite';
 
 let server, browser;
 const baseURL = process.env.TEST_URL || 'http://127.0.0.1:4187/';
+// Allow a slower first shader compile under software WebGL. Interaction
+// assertions retain Playwright's normal timeout.
+const startupTimeout = 90000;
 before(async () => {
   if (!process.env.TEST_URL) {
     server = await createServer({ server: { host: '127.0.0.1', port: 4187, strictPort: true } });
@@ -34,11 +37,11 @@ async function bookPoint(page, action) {
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-test('the leather book opens by its geometry, turns blank pages both ways, and closes from the keyboard', async () => {
+test('the leather book opens by its geometry, turns ornamented pages both ways, and closes from the keyboard', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout }); await nextFrame(page);
   const closed = await bookPoint(page, 'toggle');
   await page.mouse.move(closed.x, closed.y); await page.mouse.down();
   await page.mouse.move(closed.x + 30, closed.y + 12, { steps: 3 }); await page.mouse.up();
@@ -52,7 +55,7 @@ test('the leather book opens by its geometry, turns blank pages both ways, and c
   await page.locator('#room[data-book-page="1"]').waitFor();
   const left = await bookPoint(page, 'previous'); await page.mouse.click(left.x, left.y);
   await page.locator('#room[data-book-page="0"]').waitFor();
-  await page.getByRole('button', { name: 'Next blank page' }).focus(); await page.keyboard.press('ArrowRight');
+  await page.getByRole('button', { name: 'Next page', exact: true }).focus(); await page.keyboard.press('ArrowRight');
   await page.locator('#room[data-book-page="1"]').waitFor();
   await page.keyboard.press('ArrowRight'); await page.locator('#room[data-book-page="2"]').waitFor();
   await page.screenshot({ path: 'test-results/book-pages-desktop.png' });
@@ -66,7 +69,7 @@ test('the leather book opens by its geometry, turns blank pages both ways, and c
 
 test('touch opens the book and turns pages while pinching remains a zoom gesture', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
-  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout }); await nextFrame(page);
   const cover = await bookPoint(page, 'toggle'); await page.touchscreen.tap(cover.x, cover.y);
   await page.locator('#room[data-book-phase="open"]').waitFor();
   await page.screenshot({ path: 'test-results/book-open-mobile.png' });
@@ -94,8 +97,14 @@ test('touch opens the book and turns pages while pinching remains a zoom gesture
 
 test('double-click reads the book full screen without turning a page and restores the desk view', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+  const passages = [
+    'A quiet light rested upon the ivory desk. Beyond the window, the last roses stirred in the autumn air. The room held the warmth of an afternoon spent among books, and every turning leaf carried the soft trace of time.',
+    'The garden path curved beneath the branches, where fallen petals gathered in the shade. A letter lay unwritten, its thoughts still wandering through the long, unhurried day.',
+    'Evening brought a gentler light. The gilt upon the binding caught its final glow, while the open pages waited for another story to begin. Éléonore’s words remained clear upon the paper.',
+  ];
+  await page.route('**/book.txt', route => route.fulfill({ contentType: 'text/plain; charset=utf-8', body: `# Not printed\n${passages.join('\n---\n')}` }));
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout }); await nextFrame(page);
   await page.screenshot({ path: 'test-results/book-corner-desktop.png' });
   const start = await drawerPoint(page, 0), cover = await bookPoint(page, 'toggle');
   assert.ok(cover.x > 1000 && cover.y < 400, 'The smaller book should sit toward the upper-right desk corner');
@@ -103,12 +112,15 @@ test('double-click reads the book full screen without turning a page and restore
   await page.locator('#room[data-book-reading="true"][data-book-phase="open"]').waitFor(); await nextFrame(page);
   assert.equal(await page.evaluate(() => document.fullscreenElement?.id), 'room');
   assert.equal(await page.locator('#room').getAttribute('data-book-page'), '0');
+  assert.equal(await page.locator('#book-transcript section').textContent(), passages[0]);
+  assert.equal(await page.evaluate(() => document.fonts.check('35px "Old Standard TT"', 'Éléonore')), true);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   const reader = await page.screenshot({ path: 'test-results/book-reader-desktop.png' });
   const wood = await sharp(reader).extract({ left: 12, top: 180, width: 40, height: 140 }).stats();
   assert.ok(wood.channels.slice(0, 3).every(channel => channel.mean > 170), 'Fullscreen must retain the ivory wood behind the book');
   assert.ok(wood.channels[0].stdev > .25, 'The wood backdrop must retain its rendered grain and shading');
   await page.keyboard.press('ArrowRight'); await page.locator('#room[data-book-page="1"]').waitFor();
+  assert.deepEqual(await page.locator('#book-transcript section').allTextContents(), passages.slice(1));
   await page.screenshot({ path: 'test-results/book-reader-turned.png' });
   await page.getByRole('button', { name: 'Return to desk', exact: true }).click();
   await page.locator('#room[data-book-reading="false"]').waitFor();
@@ -136,7 +148,7 @@ test('double-click reads the book full screen without turning a page and restore
 test('double-tap opens a responsive reader when native fullscreen is unavailable', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   await page.addInitScript(() => { Element.prototype.requestFullscreen = () => Promise.reject(new Error('Fullscreen unavailable')); });
-  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout }); await nextFrame(page);
   await page.screenshot({ path: 'test-results/book-corner-mobile.png' });
   const cover = await bookPoint(page, 'toggle'); await page.touchscreen.tap(cover.x, cover.y);
   await page.locator('#room[data-book-phase="open"]').waitFor();
@@ -176,7 +188,7 @@ test('double-tap opens a responsive reader when native fullscreen is unavailable
 test('drawers open independently by clicking their geometry, retain their carvings, and close from the keyboard', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   await page.goto(baseURL);
-  await page.locator('#room.is-ready').waitFor();
+  await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout });
   const drawers = page.locator('.drawer-hotspot');
   const left = await drawerPoint(page, 0), right = await drawerPoint(page, 2);
   assert.ok(Math.abs(left.y - right.y) < .1, 'Knobs on opposite sides should be level');
@@ -210,7 +222,7 @@ test('drawers open independently by clicking their geometry, retain their carvin
 
 test('wheel, buttons and keyboard zoom are bounded and Reset view restores the composition', async () => {
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
-  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor();
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout });
   const start = await drawerPoint(page, 0);
   await page.mouse.move(720, 450); await page.mouse.wheel(0, -250); await nextFrame(page);
   assert.equal(await page.getByRole('button', { name: 'Zoom out', exact: true }).isEnabled(), true);
@@ -237,7 +249,7 @@ test('wheel, buttons and keyboard zoom are bounded and Reset view restores the c
 test('drawer motion can reverse, reduced motion settles it, and graphics recovery preserves state', async () => {
   const page = await browser.newPage({ viewport: { width: 1000, height: 800 }, reducedMotion: 'no-preference' });
   await page.addInitScript(() => { Element.prototype.requestFullscreen = undefined; });
-  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor();
+  await page.goto(baseURL); await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout });
   const drawer = page.locator('.drawer-hotspot').nth(1), start = await drawerPoint(page, 1);
   await page.mouse.click(start.x, start.y);
   await page.waitForFunction(y => document.querySelectorAll('.drawer-hotspot')[1].getBoundingClientRect().top + 22 > y + 8, start.y);
@@ -261,7 +273,7 @@ test('drawer motion can reverse, reduced motion settles it, and graphics recover
   assert.equal(await page.locator('#book-controls').isVisible(), false);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   await page.evaluate(() => { window.recoveryExtension.restoreContext(); delete window.recoveryExtension; });
-  await page.locator('#room.is-ready').waitFor(); await nextFrame(page);
+  await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout }); await nextFrame(page);
   assert.equal(await page.locator('#room').getAttribute('data-book-phase'), 'open');
   assert.equal(await page.locator('#room').getAttribute('data-book-page'), '1', 'Graphics recovery must preserve the open book and its current leaf');
   assert.equal(await page.locator('#room').getAttribute('data-book-reading'), 'true');
@@ -299,7 +311,7 @@ test('desk renders, atmosphere and close view work, and keyboard controls remain
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto(baseURL);
-  await page.locator('#room.is-ready').waitFor();
+  await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout });
   await page.locator('.desk-controls.has-metal-frame').waitFor();
   const dayFrame = await page.locator('#control-frame').evaluate(canvas => canvas.toDataURL());
   assert.equal((await page.locator('.desk-controls').innerText()).trim(), '', 'Controls must not add visible text over the desk');
@@ -322,7 +334,7 @@ test('desk renders, atmosphere and close view work, and keyboard controls remain
 test('portrait layout supports touch inspection, keyboard recentering, and both controls', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
   await page.goto(baseURL);
-  await page.locator('#room.is-ready').waitFor();
+  await page.locator('#room.is-ready').waitFor({ timeout: startupTimeout });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   await page.screenshot({ path: 'test-results/mobile.png' });
   const centered = await page.locator('#desk').screenshot();
@@ -373,6 +385,7 @@ test('a texture loading failure keeps the fallback visible and removes inactive 
 
 test('browsers without WebGL show the matching still desk', async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  await page.route('**/book.txt', route => route.fulfill({ contentType: 'text/plain', body: '# Editor note\nThis book text remains accessible without WebGL.\n\n<script>Literal words, never executable markup.</script>' }));
   await page.addInitScript(() => {
     const getContext = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (type, ...args) {
@@ -381,6 +394,10 @@ test('browsers without WebGL show the matching still desk', async () => {
   });
   await page.goto(baseURL);
   await page.locator('#room.is-fallback').waitFor();
+  await page.waitForFunction(() => document.querySelector('#book-transcript').textContent.includes('accessible without WebGL'));
+  assert.equal(await page.locator('#book-transcript').getAttribute('hidden'), null);
+  assert.equal(await page.locator('#book-transcript script').count(), 0);
+  assert.equal(await page.locator('#book-transcript p').count(), 2);
   const still = await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode();
     return { width: image.naturalWidth, source: image.currentSrc };

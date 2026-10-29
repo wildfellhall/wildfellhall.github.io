@@ -21,10 +21,11 @@
       <h1 class="sr-only">Wildfell Hall</h1>
       <canvas id="desk" aria-describedby="desk-help" aria-label="An elevated view of an antique ivory writing desk, with a maroon leather-bound copy of The Tenant of Wildfell Hall, visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, a brass oval crest with embossed gold script, roses and leaves, and a light pink floral carpet"></canvas>
       <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space. Click the maroon book to open it. Double-click or double-tap the book for a full-screen reading view, or use the Read book full screen button. Click the right page to turn forward, or the left page to turn back. With the book open, the left and right arrow keys turn pages. Escape returns from reading view to the same page on the desk; otherwise it closes the book. Tab also reaches the book and page controls.</p>
-      <div id="book-controls" role="group" aria-label="The Tenant of Wildfell Hall, blank aged pages" hidden>
+      <article id="book-transcript" class="sr-only" aria-label="Current book pages" hidden></article>
+      <div id="book-controls" role="group" aria-label="The Tenant of Wildfell Hall, ornamented aged pages" aria-controls="book-transcript" hidden>
         <button class="book-hotspot" data-book-action="toggle" aria-label="Open The Tenant of Wildfell Hall" aria-expanded="false"></button>
-        <button class="book-hotspot" data-book-action="previous" aria-label="Previous blank page" hidden></button>
-        <button class="book-hotspot" data-book-action="next" aria-label="Next blank page" hidden></button>
+        <button class="book-hotspot" data-book-action="previous" aria-label="Previous page" hidden></button>
+        <button class="book-hotspot" data-book-action="next" aria-label="Next page" hidden></button>
       </div>
       <div id="drawer-controls" role="group" aria-label="Desk drawers" hidden>
         <button class="drawer-hotspot" aria-label="Open left drawer" aria-expanded="false"></button>
@@ -93,7 +94,7 @@
           </button>
         </div>
       <p id="render-status" class="sr-only" role="status" aria-live="polite">Preparing the writing room.</p>
-      <noscript><p class="sr-only">A still version of the writing desk and leather-bound book. Enable JavaScript for lighting, zoom, opening drawers, and turning the book's blank pages.</p></noscript>
+      <noscript><p class="sr-only">A still version of the writing desk and leather-bound book. Enable JavaScript for lighting, zoom, opening drawers, and turning the book's pages. <a href="./book.txt">Read the book text</a>.</p></noscript>
     </main>
     <script type="module" src="/src/main.js"></script>
   </body>

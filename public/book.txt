@@ -1,0 +1,8 @@
+# BOOK TEXT — edit this file to change the words printed in the book.
+# Write or paste your text below these instructions, then save as UTF-8.
+# Blank lines start new paragraphs. Ordinary line breaks wrap automatically.
+# Put --- on a line by itself to begin a new page (optional).
+# Lines beginning with # are notes and are not printed in the book.
+# Pages are added automatically; you do not need to count or size them.
+# To update the website, commit this file and push to main on GitHub.
+# These instructions can stay here. Until you add text, the pages stay blank.

@@ -9,9 +9,14 @@ import { createDeskInteraction } from './desk-interaction.js';
 import { createControlFrame } from './control-frame.js';
 import { createBook } from './book.js';
 import { applyWoodCoordinates } from './wood-finish.js';
+import { parseBookText } from './book-text.js';
 
 const room = document.querySelector('#room'), canvas = document.querySelector('#desk');
 const status = document.querySelector('#render-status');
+const bookText = fetch(`${import.meta.env.BASE_URL}book.txt`, { cache: 'no-cache' }).then(response => {
+  if (!response.ok) throw new Error(`Book text: HTTP ${response.status}`);
+  return response.text();
+}).catch(error => { console.warn('The book text could not be loaded; keeping its decorated pages:', error); return ''; });
 const lightButton = document.querySelector('#light-toggle'), viewButton = document.querySelector('#view-toggle');
 const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)'), finePointer = window.matchMedia('(pointer: fine)');
 let evening = false, close = false, engine;
@@ -80,7 +85,7 @@ async function init() {
   fill.position.set(9, 3, 7); scene.add(fill);
   const rim = new THREE.DirectionalLight('#fff3e3', .45);
   rim.position.set(-2, 6, -8); scene.add(rim);
-  const [desk, carpet, book] = await Promise.all([createDesk(renderer), createCarpet(renderer), createBook(DESK.surfaceY)]);
+  const [desk, carpet, book] = await Promise.all([createDesk(renderer), createCarpet(renderer), bookText.then(text => createBook(DESK.surfaceY, text))]);
   const controlFrame = await createControlFrame(document.querySelector('.desk-controls')).catch(error => {
     console.warn('Using the still metal frame:', error);
     return null;
@@ -205,4 +210,12 @@ init().then(result => { engine = result; }).catch(error => {
   document.querySelector('.desk-controls').hidden = true;
   document.querySelector('#drawer-controls').hidden = true;
   document.querySelector('#book-controls').hidden = true;
+  bookText.then(text => {
+    const transcript = document.querySelector('#book-transcript'); transcript.replaceChildren();
+    transcript.setAttribute('aria-label', 'Book text');
+    for (const block of parseBookText(text)) if (block.type === 'paragraph') {
+      const p = document.createElement('p'); p.textContent = block.text; transcript.append(p);
+    }
+    transcript.hidden = !transcript.childElementCount;
+  });
 });

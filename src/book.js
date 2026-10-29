@@ -3,13 +3,19 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createBookMaterials } from './book-materials.js';
+import { createBookPages } from './book-pages.js';
+import { pageFaces } from './book-text.js';
 import { BookMotion, LEAF_COUNT } from './book-motion.js';
 import { PAGE_WIDTH, PAGE_DEPTH, PAGE_BASE, SHEET_STEP, createLeafGeometry, bendLeaf, createPageBlock, sizePageBlock, sewnHeight, paperProfile } from './book-geometry.js';
 
 import { COVER_WIDTH, COVER_DEPTH, COVER_THICKNESS, CLOSED_HINGE, OPEN_HINGE, JOINT, BAND_POSITIONS, createSpineGeometry, updateSpineGeometry, createSpineFillet, updateSpineFillet } from './book-binding.js';
 
-export async function createBook(surfaceY) {
-  const materials = createBookMaterials(), motion = new BookMotion();
+export async function createBook(surfaceY, source = '') {
+  const materials = createBookMaterials(), printing = await createBookPages(materials.paper, source);
+  const motion = new BookMotion(printing.leafCount);
+  // More written pages divide the same slim physical text block into finer
+  // leaves, preserving the established cover, spine and desk composition.
+  const physicalCount = count => count * LEAF_COUNT / motion.leafCount;
   const group = new THREE.Group(); group.name = 'tenant-of-wildfell-hall';
   group.position.set(4.25, surfaceY + .004, -1.55); group.rotation.y = -.065;
   group.scale.setScalar(.76);
@@ -31,7 +37,7 @@ export async function createBook(surfaceY) {
   const front = new THREE.Group(); group.add(front);
   board(front, 'hinged-leather-front-board', 'toggle');
   for (const [parent, sign] of [[front, -1], [back, 1]]) {
-    const lining = mesh(new THREE.PlaneGeometry(COVER_WIDTH - .15, COVER_DEPTH - .15), materials.paper[2], parent, 'blank-aged-pastedown');
+    const lining = mesh(new THREE.PlaneGeometry(COVER_WIDTH - .15, COVER_DEPTH - .15), printing.get(sign < 0 ? -1 : -2), parent, 'ornamented-aged-pastedown');
     lining.rotation.x = -sign * Math.PI / 2;
     lining.position.set(COVER_WIDTH / 2, sign * (COVER_THICKNESS / 2 + .001), 0);
     lining.castShadow = false;
@@ -63,7 +69,10 @@ export async function createBook(surfaceY) {
   const left = new THREE.Group(); group.add(left);
   const leftBlock = mesh(createPageBlock(), [materials.paper[1], materials.edges], left, 'left-paper-block', 'previous'); leftBlock.scale.x = -1;
   const rightBlock = mesh(createPageBlock(), [materials.paper[0], materials.edges], group, 'right-paper-block', 'next');
-  const turning = mesh(createLeafGeometry(), materials.paper[0], group, 'curling-paper-leaf', 'busy');
+  const recto = materials.paper[0].clone(), verso = materials.paper[0].clone();
+  recto.side = THREE.FrontSide; recto.shadowSide = THREE.DoubleSide; verso.side = THREE.BackSide;
+  const turning = mesh(createLeafGeometry(), recto, group, 'curling-paper-leaf', 'busy');
+  const reverse = mesh(turning.geometry, verso, turning, 'curling-paper-verso', 'busy'); reverse.castShadow = false;
   turning.visible = false;
   let lastLeft = -1, lastRight = -1, lastOpen = -1;
   function updateGeometry() {
@@ -76,18 +85,21 @@ export async function createBook(surfaceY) {
       for (const fillet of fillets) updateSpineFillet(fillet.mesh.geometry, fillet.z, openness);
     }
     const turn = motion.phase === 'turning';
+    const faces = pageFaces(motion.page, turn, motion.direction);
     const leftCount = motion.page - (turn && motion.direction < 0 ? 1 : 0);
-    const rightCount = LEAF_COUNT - motion.page - (turn && motion.direction > 0 ? 1 : 0);
+    const rightCount = motion.leafCount - motion.page - (turn && motion.direction > 0 ? 1 : 0);
     leftBlock.visible = leftCount > 0;
     rightBlock.visible = rightCount > 0;
     if (leftCount !== lastLeft || openness !== lastOpen) {
-      sizePageBlock(leftBlock.geometry, leftCount, openness);
-      leftBlock.material[0] = materials.paper[Math.max(0, leftCount - 1) % 3]; lastLeft = leftCount;
+      sizePageBlock(leftBlock.geometry, physicalCount(leftCount), openness);
+      lastLeft = leftCount;
     }
     if (rightCount !== lastRight || openness !== lastOpen) {
-      sizePageBlock(rightBlock.geometry, rightCount, openness);
-      rightBlock.material[0] = materials.paper[motion.page % 3]; lastRight = rightCount;
+      sizePageBlock(rightBlock.geometry, physicalCount(rightCount), openness);
+      lastRight = rightCount;
     }
+    leftBlock.material[0] = printing.get(faces.left);
+    rightBlock.material[0] = printing.get(faces.right);
     lastOpen = openness;
     // A gathered left-hand stack returns with the board when closing. It
     // settles above the remaining right-hand pages, then resets under cover.
@@ -98,19 +110,22 @@ export async function createBook(surfaceY) {
     if (turn) {
       const t = motion.turnProgress, eased = t * t * (3 - 2 * t);
       const p = motion.direction > 0 ? eased : 1 - eased;
-      const count = THREE.MathUtils.lerp(LEAF_COUNT - motion.index, motion.index + 1, p);
+      const count = physicalCount(THREE.MathUtils.lerp(motion.leafCount - motion.index, motion.index + 1, p));
       turning.position.x = THREE.MathUtils.lerp(.045, -.045, p);
       bendLeaf(turning.geometry, p, sewnHeight(count) + .0007, 1, count * SHEET_STEP);
-      turning.material = materials.paper[motion.index % 3];
+      for (const [target, index] of [[recto, faces.front], [verso, faces.back]]) {
+        const printed = printing.get(index); target.map = printed.map; target.bumpMap = printed.bumpMap;
+      }
     }
+    printing.prune(new Set([-1, -2, faces.left, faces.right, faces.front, faces.back]));
     // A real paper fold connects the pastedowns and the sewn page roots.
     front.updateMatrix(); left.updateMatrix(); back.updateMatrix();
     const rootAt = (count, side) => count > 0
-      ? new THREE.Vector3(0, sewnHeight(count, openness), 0).applyMatrix4(side < 0 ? left.matrix : rightBlock.matrix)
+      ? new THREE.Vector3(0, sewnHeight(physicalCount(count), openness), 0).applyMatrix4(side < 0 ? left.matrix : rightBlock.matrix)
       : new THREE.Vector3(.075, (side < 0 ? -1 : 1) * (COVER_THICKNESS / 2 + .001), 0).applyMatrix4(side < 0 ? front.matrix : back.matrix);
     rightBlock.updateMatrix();
     const a = rootAt(leftCount, -1), b = rootAt(rightCount, 1);
-    const slope = count => { const p = paperProfile(count, openness); return (p[1].y - p[0].y) / p[1].x; };
+    const slope = count => { const p = paperProfile(physicalCount(count), openness); return (p[1].y - p[0].y) / p[1].x; };
     const m0 = leftCount ? -slope(leftCount) : 0, m1 = rightCount ? slope(rightCount) : 0;
     // The pasted paper hinge laps very slightly over the gathered sheets.
     // This seals the cut faces and avoids a subpixel crack at their boundary.
@@ -154,7 +169,7 @@ export async function createBook(surfaceY) {
   }
   updateGeometry();
   return {
-    group, motion,
+    group, motion, pages: printing.pages,
     width: (COVER_WIDTH + JOINT) * 2 * group.scale.x, depth: COVER_DEPTH * group.scale.z,
     place(viewWidth, portrait) {
       // Keep the corner object within the cropped writing surface on phones.

@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { LEAF_COUNT } from './book-motion.js';
 
 // The camera stays square to the furniture. Inspection moves within its image
 // plane, so dragging and zooming cannot tip the desk relative to the carpet.
@@ -9,6 +8,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
   const buttons = [...drawerControls.querySelectorAll('button')];
   const names = ['left', 'centre', 'right'];
   const bookControls = document.querySelector('#book-controls');
+  const transcript = document.querySelector('#book-transcript');
   const bookClose = document.querySelector('#book-close');
   const bookRead = document.querySelector('#book-read'), viewToggle = document.querySelector('#view-toggle');
   const viewReset = document.querySelector('#view-reset');
@@ -123,7 +123,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
     if (!enabled || !book.activate(action)) return;
     if (!book.motion.opened || action === 'close') bookButtons[0].focus({ preventScroll: true });
     status.textContent = action === 'next' || action === 'previous'
-      ? 'Turning a blank, aged paper page.' : book.motion.opened
+      ? 'Turning an aged paper page.' : book.motion.opened
         ? 'The Tenant of Wildfell Hall is opening. Click the right page to turn forward, or the left to turn back. Press Escape to close.'
         : 'The Tenant of Wildfell Hall is closing.';
     invalidate();
@@ -334,12 +334,25 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
       });
       const { motion } = book;
       if (motion.phase !== lastBookPhase || motion.page !== lastBookPage) {
-        if (motion.phase === 'open') status.textContent = `The book is open. ${motion.page} of ${LEAF_COUNT} blank leaves turned. Use the left and right pages or arrow keys to turn pages. ${reading ? 'Escape returns to the desk.' : 'Double-click for full-screen reading, or press Escape to close.'}`;
+        if (motion.phase === 'open') {
+          status.textContent = `The book is open. ${motion.page} of ${motion.leafCount} leaves turned. Use the left and right pages or arrow keys to turn pages. ${reading ? 'Escape returns to the desk.' : 'Double-click for full-screen reading, or press Escape to close.'}`;
+          transcript.replaceChildren();
+          for (const index of [motion.page * 2 - 1, motion.page * 2]) {
+            if (!book.pages[index]?.text) continue;
+            const section = document.createElement('section'); section.setAttribute('aria-label', `Page ${index + 1}`);
+            for (const text of book.pages[index].text.split('\n\n')) {
+              const p = document.createElement('p'); p.textContent = text; section.append(p);
+            }
+            transcript.append(section);
+          }
+        }
         if (motion.phase === 'closed') status.textContent = 'The Tenant of Wildfell Hall is closed.';
         lastBookPhase = motion.phase; lastBookPage = motion.page;
       }
       room.dataset.bookOpen = String(motion.opened);
       room.dataset.bookPage = String(motion.page); room.dataset.bookPhase = motion.phase;
+      room.dataset.bookLeaves = String(motion.leafCount);
+      transcript.hidden = !motion.opened;
       bookControls.setAttribute('aria-busy', String(motion.busy));
       bookClose.hidden = !motion.opened;
       bookRead.hidden = !motion.opened;
@@ -347,7 +360,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
       bookButtons.forEach(button => {
         const action = button.dataset.bookAction;
         button.hidden = action !== 'toggle' && !motion.opened;
-        button.disabled = action !== 'toggle' && (motion.busy || (action === 'next' ? motion.page >= LEAF_COUNT : motion.page === 0));
+        button.disabled = action !== 'toggle' && (motion.busy || (action === 'next' ? motion.page >= motion.leafCount : motion.page === 0));
         if (action === 'toggle') {
           button.setAttribute('aria-expanded', String(motion.opened));
           button.setAttribute('aria-label', `${motion.opened ? 'Close' : 'Open'} The Tenant of Wildfell Hall`);

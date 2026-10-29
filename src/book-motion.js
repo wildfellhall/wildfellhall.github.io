@@ -1,6 +1,7 @@
 export const LEAF_COUNT = 48;
 
 export class BookMotion {
+  constructor(leafCount = LEAF_COUNT) { this.leafCount = Math.max(LEAF_COUNT, Math.ceil(leafCount)); }
   phase = 'closed'; page = 0; progress = 0; turnProgress = 0; direction = 1; index = 0; closeQueued = false;
   get openness() { return this.progress ** 2 * (3 - 2 * this.progress); }
   get busy() { return this.phase !== 'closed' && this.phase !== 'open'; }
@@ -17,7 +18,7 @@ export class BookMotion {
   }
   turn(direction) {
     if (this.phase !== 'open' || ![-1, 1].includes(direction)) return false;
-    if (this.page + direction < 0 || this.page + direction > LEAF_COUNT) return false;
+    if (this.page + direction < 0 || this.page + direction > this.leafCount) return false;
     this.direction = direction; this.index = direction > 0 ? this.page : this.page - 1;
     this.turnProgress = 0; this.phase = 'turning'; return true;
   }
