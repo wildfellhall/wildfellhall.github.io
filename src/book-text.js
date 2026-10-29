@@ -1,7 +1,9 @@
+import { composePrintedText } from './print-composition.js';
+
 // Page coordinates are independent of the viewport, so resizing never moves
 // the reader's place or changes which words belong to a physical leaf.
 export const TYPE = Object.freeze({ width: 1024, height: 1425, left: 154, right: 870,
-  top: 196, fontSize: 34, lineHeight: 46, lines: 23, indent: 102 });
+  top: 196, fontSize: 34, lineHeight: 46, lines: 23, indent: 34 });
 
 export function parseBookText(source) {
   const blocks = [], paragraph = [];
@@ -24,30 +26,7 @@ export function paginateBookText(source, measure, layout = TYPE) {
   const next = () => { page = { lines: [] }; pages.push(page); };
   for (const block of parseBookText(source)) {
     if (block.type === 'break') { next(); continue; }
-    const words = block.text.split(' '), lines = [];
-    let index = 0;
-    while (index < words.length) {
-      const indent = lines.length ? 0 : layout.indent, available = width - indent;
-      let text = '';
-      while (index < words.length) {
-        const candidate = text ? `${text} ${words[index]}` : words[index];
-        if (measure(candidate) <= available) { text = candidate; index++; continue; }
-        if (text) break;
-        // Even an unbroken URL or a long Unicode word must make progress.
-        const glyphs = Array.from(words[index]);
-        let lo = 1, hi = glyphs.length;
-        while (lo < hi) {
-          const mid = Math.ceil((lo + hi) / 2);
-          if (measure(glyphs.slice(0, mid).join('')) <= available) lo = mid;
-          else hi = mid - 1;
-        }
-        text = glyphs.slice(0, lo).join('');
-        words[index] = glyphs.slice(lo).join('');
-        if (!words[index]) index++;
-        break;
-      }
-      lines.push({ text, indent, paragraphStart: lines.length === 0, paragraphEnd: index === words.length });
-    }
+    const lines = composePrintedText(block.text, width, measure, layout.indent);
     let cursor = 0;
     while (cursor < lines.length) {
       let room = layout.lines - page.lines.length, remaining = lines.length - cursor;
@@ -55,15 +34,18 @@ export function paginateBookText(source, measure, layout = TYPE) {
       let take = Math.min(room, remaining);
       if (remaining > take && remaining - take === 1 && take > 2) take--;
       for (const line of lines.slice(cursor, cursor + take)) {
-        page.lines.push({ ...line, x: layout.left + line.indent,
+        page.lines.push({ ...line, x: layout.left + (line.paragraphStart ? layout.indent : 0),
           y: layout.top + layout.fontSize + page.lines.length * layout.lineHeight });
       }
       cursor += take;
       if (cursor < lines.length) next();
     }
   }
-  return pages.map(page => ({ ...page, text: page.lines.map((line, i) =>
-    `${i && line.paragraphStart ? '\n\n' : i ? ' ' : ''}${line.text}`).join('') }));
+  return pages.map(page => ({ ...page, text: page.lines.map((line, i) => {
+    const separator = i && line.paragraphStart ? '\n\n' : i && !page.lines[i - 1].hyphenated ? ' ' : '';
+    // Discretionary printing hyphens never enter the user's text/transcript.
+    return separator + (line.hyphenated ? line.text.slice(0, -1) : line.text);
+  }).join('') }));
 }
 
 // One physical leaf has a recto and a verso. During a turn the stationary

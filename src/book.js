@@ -119,6 +119,8 @@ export async function createBook(surfaceY, source = '', maxTextureSize = 4096) {
         // blank stock's normal map would override that field during a turn.
         if (Boolean(target.normalMap) !== Boolean(printed.normalMap)) target.needsUpdate = true;
         target.map = printed.map; target.bumpMap = printed.bumpMap; target.normalMap = printed.normalMap;
+        target.roughnessMap = printed.roughnessMap; target.bumpScale = printed.bumpScale;
+        target.specularIntensity = printed.specularIntensity; target.sheen = printed.sheen;
       }
     }
     printing.prune(new Set([-1, -2, faces.left, faces.right, faces.front, faces.back]));

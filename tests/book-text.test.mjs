@@ -23,7 +23,7 @@ test('long prose flows without loss, overprinting the border, or a fixed page li
   for (const page of pages) {
     assert.ok(page.lines.length <= TYPE.lines);
     for (const line of page.lines) {
-      assert.ok(line.x >= TYPE.left && line.x + measure(line.text) <= TYPE.right);
+      assert.ok(line.runs.every(run => run.x >= 0 && TYPE.left + run.x + run.width <= TYPE.right + .05));
       assert.ok(line.y <= 1245, 'Text stays inside the lower scrollwork');
     }
   }
@@ -37,7 +37,18 @@ test('long unbroken Unicode words wrap without dropping characters or interpreti
   const source = `Été — ${'éλЖ'.repeat(1000)}\n\n<script>alert("literal text")</script>`;
   const pages = paginateBookText(source, measure);
   assert.equal(pages.map(p => p.text).join('').replace(/\s/g, ''), source.replace(/\s/g, ''));
-  assert.ok(pages.every(p => p.lines.every(line => line.x + measure(line.text) <= TYPE.right)));
+  assert.ok(pages.every(p => p.lines.every(line => line.runs.every(run => TYPE.left + run.x + run.width <= TYPE.right + .05))));
+});
+
+test('book composition justifies interior lines while preserving literal and discretionary hyphens', () => {
+  const paragraph = 'A well-read correspondent studies the neighbourhood, its descriptions and literary observations. '.repeat(30).trim();
+  const pages = paginateBookText(paragraph, measure);
+  assert.equal(pages.map(page => page.text).join('').replace(/\s/g, ''), paragraph.replace(/\s/g, ''));
+  const lines = pages.flatMap(page => page.lines);
+  assert.ok(lines.some(line => line.hyphenated), 'Narrow measures should use British hyphenation');
+  assert.equal(lines.filter(line => line.paragraphStart).length, 1);
+  assert.equal(lines.filter(line => line.paragraphEnd).length, 1);
+  assert.ok(lines.filter(line => !line.paragraphEnd).every(line => Math.abs(TYPE.left + line.runs.at(-1).x + line.runs.at(-1).width - TYPE.right) < .1));
 });
 
 test('page turns expose the correct recto and verso in both directions', () => {

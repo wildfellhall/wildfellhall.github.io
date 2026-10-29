@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { parseGazette, paginateGazette, validDate, wrapText } from '../src/gazette-text.js';
 import { gazetteCatalog } from '../scripts/gazette-catalog.mjs';
 import { createGazetteGeometry, bendGazette, offsetGazetteLayer, GAZETTE_DEPTH } from '../src/gazette-geometry.js';
-import { composeGazetteText } from '../src/gazette-composition.js';
+import { composePrintedText as composeGazetteText } from '../src/print-composition.js';
 const published = await readFile(new URL('../public/gazette/issues/2026-10-29.txt', import.meta.url), 'utf8');
 const template = await readFile(new URL('../public/gazette/template.txt', import.meta.url), 'utf8');
 // Editorial changes belong in the published issue; deterministic pagination
@@ -124,6 +124,26 @@ test('empty editions have four distinct pages with accurate contents and enough 
   for (const page of expanded) for (const story of page.sections) {
     if (story.continues) assert.ok(expanded[story.nextPage - 1].sections.some(next => next.id === story.id && next.continued));
     if (story.continued) assert.ok(expanded[story.previousPage - 1].sections.some(previous => previous.id === story.id));
+    assert.ok(story.columns.every(column => story.bodyY + column.length * 30 <= 1750));
+  }
+});
+
+test('custom Gazette titles have separate space below section labels across wrapped and continued articles', () => {
+  const issue = parseGazette(source);
+  issue.sections[0].title = 'Objectives of Wildfell Gazette';
+  issue.sections[0].subtitle = 'Correspondence from a quiet reading room';
+  issue.sections[0].byline = 'Sanah Rajesh';
+  issue.sections[0].body = 'The morning correspondence continues. '.repeat(600);
+  issue.sections[4].title = 'Abstruse Natural Words and Observations from the Countryside';
+  const pages = paginateGazette(issue, text => text.length * 12, text => text.length * 19, composeGazetteText);
+  const stories = pages.flatMap(page => page.sections).filter(story => story.title);
+  assert.ok(stories.some(story => story.continued));
+  assert.ok(stories.some(story => story.titles.length > 1));
+  for (const story of stories) {
+    assert.ok(story.titleY - story.top - story.headline >= 28, 'The title needs clear air beneath its section label');
+    const headerBottom = story.titleY + story.titles.length * (story.headline + 8)
+      + story.subtitles.length * 32 + story.bylines.length * 30 + (story.continued ? 30 : 0);
+    assert.ok(story.bodyY - headerBottom >= 20, 'Prose must begin below the complete heading block');
     assert.ok(story.columns.every(column => story.bodyY + column.length * 30 <= 1750));
   }
 });

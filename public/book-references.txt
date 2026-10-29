@@ -1,0 +1,31 @@
+THE TENANT OF WILDFELL HALL — PRINTING REFERENCES
+
+Anne Bronte / Acton Bell, The Tenant of Wildfell Hall, volume I.
+London: T. C. Newby, 1848. Scan: Internet Archive, tenantofwildfell01bronrich.
+https://archive.org/details/tenantofwildfell01bronrich
+https://commons.wikimedia.org/wiki/File:The_tenant_of_Wildfell_Hall_(IA_tenantofwildfell01bronrich).pdf
+Studied printed pages 3–4 (scan pages 15–16): proportional Roman type,
+justified paragraphs, first-line indents, consistent baselines, and locally
+uneven dark impressions. The scan is a layout/impression reference, not a
+colour calibration. The site's ivory rag paper and romantic borders remain.
+The scan and its prose are not redistributed as website content.
+
+Old Standard TT Regular, Alexey Kryukov / The Old Standard Project Authors.
+https://github.com/google/fonts/tree/main/ofl/oldstandardtt
+https://raw.githubusercontent.com/google/fonts/main/ofl/oldstandardtt/DESCRIPTION.en_us.html
+A freely licensed revival of Modern-style type associated with later
+nineteenth- and early twentieth-century books; a visual interpretation,
+not an identification or exact reconstruction of Newby's 1848 printing type.
+The unmodified OldStandard-Regular.ttf is served locally. SIL OFL 1.1:
+/ornaments/old-standard-tt-OFL.txt. No paid font or runtime font service is used.
+
+Book ink shares the Gazette's procedural press treatment, with fewer fibre
+voids and lighter local drag to preserve fine serif hairlines. Small ink
+squeeze, shallow paper compression and an ink-dependent roughness map keep
+the impression in the paper under the existing room lighting. The font file
+is not distressed or modified: variation is applied to each printed page.
+
+Paragraph composition shares tex-linebreak and the British hyphenation
+patterns documented in /gazette/references.txt. Discretionary hyphens are
+rendering only; the editable book.txt and accessible text keep the author's
+words. Blank paragraphs and explicit --- page breaks retain their meaning.

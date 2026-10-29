@@ -114,21 +114,11 @@ test('double-click reads the book full screen without turning a page and restore
   assert.equal(await page.locator('#room').getAttribute('data-book-page'), '0');
   assert.equal(await page.locator('#book-transcript section').textContent(), passages[0]);
   assert.equal(await page.evaluate(() => [...document.fonts].some(face =>
-    face.family.replaceAll('"', '') === 'Wildfell Typewriter' && face.status === 'loaded')), true);
+    face.family.replaceAll('"', '') === 'Wildfell Book Roman' && face.status === 'loaded')), true);
   assert.ok(await page.evaluate(() => {
-    const ctx = document.createElement('canvas').getContext('2d'); ctx.font = '34px "Wildfell Typewriter"';
-    return Math.abs(ctx.measureText('iiiii').width - ctx.measureText('WWWWW').width) < .01;
-  }), 'The loaded typewriter face must retain a fixed character pitch');
-  assert.ok(await page.evaluate(() => {
-    const canvas = document.createElement('canvas'); canvas.width = 800; canvas.height = 160;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    ctx.font = '100px "Wildfell Typewriter"'; ctx.fontKerning = 'none'; ctx.fillText('eeeeee', 10, 120);
-    const shaped = ctx.getImageData(0, 0, 800, 160).data; ctx.clearRect(0, 0, 800, 160);
-    let x = 10; for (const glyph of 'eeeeee') { ctx.fillText(glyph, x, 120); x += ctx.measureText(glyph).width; }
-    const repeated = ctx.getImageData(0, 0, 800, 160).data;
-    let differences = 0; for (let i = 3; i < shaped.length; i += 4) if (Math.abs(shaped[i] - repeated[i]) > 20) differences++;
-    return differences > 400;
-  }), 'Whole text runs must use the alternate impressions, not six identical glyphs');
+    const ctx = document.createElement('canvas').getContext('2d'); ctx.font = '34px "Wildfell Book Roman"';
+    return ctx.measureText('WWWWW').width > ctx.measureText('iiiii').width * 2;
+  }), 'The book must load proportional Roman type before composing the pages');
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   const reader = await page.screenshot({ path: 'test-results/book-reader-desktop.png' });
   const wood = await sharp(reader).extract({ left: 12, top: 180, width: 40, height: 140 }).stats();
@@ -418,7 +408,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-4$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-5$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   assert.equal(await page.locator('#book-controls').isVisible(), false);
@@ -428,7 +418,7 @@ test('browsers without WebGL show the matching still desk', async () => {
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=gazette-4$/);
+  }), /desk-still-wide\.webp\?v=gazette-5$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });
@@ -602,7 +592,8 @@ test('turning printed leaves retain the ink-compressed paper surface on both fac
     const book = await createBook(0, 'A printed recto.\n---\nA printed verso.');
     book.motion.open(); book.animate(0, true); book.activate('next'); book.animate(.15, false);
     const front = book.group.getObjectByName('curling-paper-leaf'), back = book.group.getObjectByName('curling-paper-verso');
-    const printed = [front, back].every(face => face.material.normalMap === null && face.material.bumpMap.isCanvasTexture && face.material.map.isCanvasTexture);
+    const printed = [front, back].every(face => face.material.normalMap === null && face.material.bumpMap.isCanvasTexture
+      && face.material.roughnessMap.isCanvasTexture && face.material.map.isCanvasTexture);
     book.animate(0, true); book.activate('next'); book.animate(.15, false);
     const blank = [front, back].every(face => Boolean(face.material.normalMap));
     return { printed, blank };

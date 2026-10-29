@@ -74,6 +74,10 @@ export function wrapText(text, width, measure) {
 // front page, further articles, a literary page and a miscellany page.
 // Continuations are inserted immediately after their original page.
 export const GAZETTE_TYPE = Object.freeze({ width: 1400, height: 1900, fontSize: 26, leading: 30, bottom: 1750 });
+// Shared by pagination and painting so extra heading space cannot collide
+// with article prose or get lost on continuation pages.
+export const GAZETTE_HEADING = Object.freeze({ labelOffset: 10, titledOffset: 70, plainOffset: 38,
+  titleLeading: 8, subtitleLeading: 32, bylineLeading: 30, continuationLeading: 30, bodyGap: 22, ruleGap: 30 });
 export const EDITION = Object.freeze([
   { name: 'Articles', sections: [{ id: 'article-1', x: 78, width: 810, columns: 2, headline: 35 },
     { id: 'article-2', x: 934, width: 388, columns: 1, headline: 31 }] },
@@ -101,14 +105,17 @@ export function paginateGazette(issue, measure, titleMeasure, compose = wrapText
       const front = templateIndex === 0 && !continuation, top = front ? 540 : 202;
       const sections = stories.filter(s => !s.used || s.remaining.length).map(story => {
         const continued = story.used;
-        const headerHeight = 42 + story.titles.length * (story.headline + 5)
-          + story.subtitles.length * 30 + story.bylines.length * 27 + (continued ? 28 : 0);
+        const titleY = top + (story.title ? GAZETTE_HEADING.titledOffset : GAZETTE_HEADING.plainOffset);
+        const headerHeight = titleY - top + GAZETTE_HEADING.bodyGap
+          + story.titles.length * (story.headline + GAZETTE_HEADING.titleLeading)
+          + story.subtitles.length * GAZETTE_HEADING.subtitleLeading + story.bylines.length * GAZETTE_HEADING.bylineLeading
+          + (continued ? GAZETTE_HEADING.continuationLeading : 0);
         const bodyY = top + headerHeight;
         const capacity = Math.floor((GAZETTE_TYPE.bottom - 45 - bodyY) / GAZETTE_TYPE.leading);
         if (capacity < 3) throw new Error(`The heading for ${story.label} is too long. Shorten its title, subtitle or byline.`);
         const columns = Array.from({ length: story.columns }, () => story.remaining.splice(0, capacity));
         story.used = true;
-        return { ...story, remaining: undefined, top, bodyY, columns, continued,
+        return { ...story, remaining: undefined, top, titleY, bodyY, columns, continued,
           lines: columns.flat().map(line => typeof line === 'string' ? line : line.text), continues: story.remaining.length > 0 };
       });
       pages.push({ name: template.name, front, sections }); continuation = true;

@@ -5,8 +5,8 @@ import headingUrl from './assets/fonts/imfellgreatprimer.woff2?url';
 import noticeUrl from './assets/fonts/besley.woff2?url';
 import { createPaperStock, canvasFromMap, paperNoise } from './paper-stock.js';
 import { distressPressInk } from './press-ink.js';
-import { dateLabel, paginateGazette, GAZETTE_TYPE } from './gazette-text.js';
-import { composeGazetteText } from './gazette-composition.js';
+import { dateLabel, paginateGazette, GAZETTE_TYPE, GAZETTE_HEADING } from './gazette-text.js';
+import { composePrintedText } from './print-composition.js';
 
 const W = 1400, H = 1900, FACE = '"Gazette Pica", serif', HEADING = '"Gazette Primer", serif';
 let masthead;
@@ -133,15 +133,15 @@ function pageDesign(ctx, page, issue, count) {
       for (const offset of [-26, -22]) { ctx.lineWidth = offset === -26 ? 1.4 : .6; ctx.beginPath(); ctx.moveTo(x + offset, top - 16); ctx.lineTo(x + offset, 1750); ctx.stroke(); }
     }
     ctx.textAlign = 'center'; ctx.font = `20px ${HEADING}`;
-    if (story.title) ctx.fillText(story.label.toUpperCase(), x + width / 2, top + 5);
-    ctx.font = `${story.headline}px ${HEADING}`; let y = top + 38;
-    for (const title of story.titles) { ctx.fillText(title.toUpperCase(), x + width / 2, y); y += story.headline + 5; }
+    if (story.title) ctx.fillText(story.label.toUpperCase(), x + width / 2, top + GAZETTE_HEADING.labelOffset);
+    ctx.font = `${story.headline}px ${HEADING}`; let y = story.titleY;
+    for (const title of story.titles) { ctx.fillText(title.toUpperCase(), x + width / 2, y); y += story.headline + GAZETTE_HEADING.titleLeading; }
     ctx.font = `italic 25px ${FACE}`;
-    for (const subtitle of story.subtitles) { ctx.fillText(subtitle, x + width / 2, y); y += 30; }
+    for (const subtitle of story.subtitles) { ctx.fillText(subtitle, x + width / 2, y); y += GAZETTE_HEADING.subtitleLeading; }
     ctx.font = `italic 24px ${FACE}`;
-    for (const byline of story.bylines) { ctx.fillText(byline, x + width / 2, y); y += 27; }
+    for (const byline of story.bylines) { ctx.fillText(byline, x + width / 2, y); y += GAZETTE_HEADING.bylineLeading; }
     if (story.continued) { ctx.font = `italic 22px ${FACE}`; ctx.fillText(`Continued from page ${story.previousPage}.`, x + width / 2, y); }
-    rule(ctx, bodyY - 23, x + width * .34, width * .32);
+    rule(ctx, bodyY - GAZETTE_HEADING.ruleGap, x + width * .34, width * .32);
     ctx.textAlign = 'left'; ctx.font = `${GAZETTE_TYPE.fontSize}px ${FACE}`;
     for (const [col, lines] of story.columns.entries()) {
       const cx = x + col * (columnWidth + 36);
@@ -168,7 +168,7 @@ export function createGazettePrinting(issue, maxTextureSize = 4096) {
   const stock = createPaperStock(41, true), background = canvasFromMap(stock.map), height = canvasFromMap(stock.bumpMap);
   const measure = canvas().getContext('2d'); measure.font = `${GAZETTE_TYPE.fontSize}px ${FACE}`;
   const titleMeasure = canvas().getContext('2d'); titleMeasure.font = `38px ${HEADING}`;
-  const pages = paginateGazette(issue, s => measure.measureText(s).width, s => titleMeasure.measureText(s.toUpperCase()).width, composeGazetteText);
+  const pages = paginateGazette(issue, s => measure.measureText(s).width, s => titleMeasure.measureText(s.toUpperCase()).width, composePrintedText);
   const cache = new Map();
   function get(page = 0, reverse = false, low = false) {
     const key = `${page}:${reverse}:${low}`; if (cache.has(key)) return cache.get(key);

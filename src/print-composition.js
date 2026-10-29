@@ -10,7 +10,7 @@ const hyphenate = word => /^[A-Za-zÀ-ÿ]{7,}[,.;:!?]?$/.test(word) ? britishHyp
 // Set a whole paragraph before choosing line endings. The positioned runs
 // preserve the compositor's spacing through column and page continuations.
 // Hyphens are presentation only: the editable source/transcript is untouched.
-export function composeGazetteText(text, width, measure, indent = 24) {
+export function composePrintedText(text, width, measure, indent = 24) {
   const result = [];
   for (const paragraph of text.trim().split(/\n\s*\n/).filter(Boolean)) {
     const clean = paragraph.replace(/\s+/g, ' ').trim();
@@ -29,6 +29,7 @@ export function composeGazetteText(text, width, measure, indent = 24) {
       const item = items[position.item], value = item.type === 'penalty' ? '-' : item.text;
       if (!value) continue;
       const line = lines[position.line] ||= { text: '', runs: [], paragraphStart: position.line === 0, paragraphEnd: false };
+      line.hyphenated = item.type === 'penalty';
       const x = position.xOffset;
       const previous = line.runs.at(-1);
       if (previous && Math.abs(previous.x + previous.width - x) < .01) {
@@ -52,10 +53,10 @@ export function composeGazetteText(text, width, measure, indent = 24) {
 function emergencyLines(text, width, measure, indent) {
   const lines = []; let current = '';
   const limit = () => width - (lines.length ? 0 : indent);
-  function flush() {
+  function flush(hyphenated = false) {
     if (!current) return;
     lines.push({ text: current, runs: [{ text: current, x: lines.length ? 0 : indent, width: measure(current) }],
-      paragraphStart: !lines.length, paragraphEnd: false });
+      paragraphStart: !lines.length, paragraphEnd: false, hyphenated });
     current = '';
   }
   for (const word of text.split(' ')) {
@@ -64,7 +65,7 @@ function emergencyLines(text, width, measure, indent) {
     while (measure(remainder) > limit()) {
       const characters = Array.from(remainder); let end = 1;
       while (end < characters.length && measure(characters.slice(0, end + 1).join('') + '-') <= limit()) end++;
-      current = characters.slice(0, end).join('') + '-'; flush();
+      current = characters.slice(0, end).join('') + '-'; flush(true);
       remainder = characters.slice(end).join('');
     }
     current += `${current ? ' ' : ''}${remainder}`;
