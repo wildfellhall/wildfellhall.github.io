@@ -10,8 +10,8 @@ import { PAGE_WIDTH, PAGE_DEPTH, PAGE_BASE, SHEET_STEP, createLeafGeometry, bend
 
 import { COVER_WIDTH, COVER_DEPTH, COVER_THICKNESS, CLOSED_HINGE, OPEN_HINGE, JOINT, BAND_POSITIONS, createSpineGeometry, updateSpineGeometry, createSpineFillet, updateSpineFillet } from './book-binding.js';
 
-export async function createBook(surfaceY, source = '') {
-  const materials = createBookMaterials(), printing = await createBookPages(materials.paper, source);
+export async function createBook(surfaceY, source = '', maxTextureSize = 4096) {
+  const materials = createBookMaterials(), printing = await createBookPages(materials.paper, source, maxTextureSize);
   const motion = new BookMotion(printing.leafCount);
   // More written pages divide the same slim physical text block into finer
   // leaves, preserving the established cover, spine and desk composition.

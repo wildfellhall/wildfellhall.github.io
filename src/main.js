@@ -85,7 +85,7 @@ async function init() {
   fill.position.set(9, 3, 7); scene.add(fill);
   const rim = new THREE.DirectionalLight('#fff3e3', .45);
   rim.position.set(-2, 6, -8); scene.add(rim);
-  const [desk, carpet, book] = await Promise.all([createDesk(renderer), createCarpet(renderer), bookText.then(text => createBook(DESK.surfaceY, text))]);
+  const [desk, carpet, book] = await Promise.all([createDesk(renderer), createCarpet(renderer), bookText.then(text => createBook(DESK.surfaceY, text, renderer.capabilities.maxTextureSize))]);
   const controlFrame = await createControlFrame(document.querySelector('.desk-controls')).catch(error => {
     console.warn('Using the still metal frame:', error);
     return null;

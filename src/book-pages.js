@@ -1,61 +1,48 @@
 import * as THREE from 'three';
-import '@fontsource/courier-prime/400.css';
 import { TYPE, paginateBookText } from './book-text.js';
 import { drawPageOrnaments } from './book-page-ornaments.js';
 import { LEAF_COUNT } from './book-motion.js';
+import { TYPEWRITER_FONT, loadTypewriter, createInkLayer, createImpressedPaper } from './book-ink.js';
 
-// Fixed-pitch typewriter lettering, locally served under the SIL OFL.
-// Repeatable variations in ribbon pressure keep the ink stable when returning
-// to a page, while letting individual strikes have slightly different weight.
-function ribbonPressure(seed) {
-  let n = Math.imul(seed ^ 1848, 374761393);
-  n = Math.imul(n ^ n >>> 13, 1274126177);
-  return ((n ^ n >>> 16) >>> 0) / 4294967296;
-}
-
-export async function createBookPages(paper, source) {
-  const font = `${TYPE.fontSize}px "Courier Prime", "Courier New", monospace`;
-  try { await document.fonts.load(font, source || 'Aa Éé'); }
+export async function createBookPages(paper, source, maxTextureSize = 4096) {
+  try { await loadTypewriter(); }
   catch (error) { console.warn('Using the book’s typewriter fallback:', error); }
-  const measure = document.createElement('canvas').getContext('2d'); measure.font = font;
+  const measure = document.createElement('canvas').getContext('2d'); measure.font = TYPEWRITER_FONT;
   measure.fontKerning = 'none';
-  const pages = paginateBookText(source, text => measure.measureText(text).width);
-  const graphemes = typeof Intl.Segmenter === 'function'
-    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
-    : { segment: text => Array.from(text.normalize('NFC'), segment => ({ segment })) };
+  const pages = paginateBookText(source, text => measure.measureText(text).width,
+    { ...TYPE, indent: measure.measureText('     ').width });
   const cache = new Map();
-  const backgrounds = paper.map(material => {
-    const { data, width, height } = material.map.image;
+  function canvasFromMap(map) {
+    const { data, width, height } = map.image;
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
     canvas.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(data), width, height), 0, 0);
     return canvas;
-  });
+  }
+  const backgrounds = paper.map(material => canvasFromMap(material.map));
+  const paperHeights = paper.map(material => canvasFromMap(material.bumpMap));
   function get(index) {
     if (cache.has(index)) { const value = cache.get(index); cache.delete(index); cache.set(index, value); return value; }
     const seed = ((index % paper.length) + paper.length) % paper.length;
-    const canvas = document.createElement('canvas'); canvas.width = TYPE.width; canvas.height = TYPE.height;
+    const printed = Boolean(pages[index]?.lines.length), mirrored = Math.abs(index % 2) === 1;
+    const scale = printed ? Math.min(2, maxTextureSize / TYPE.height) : 1;
+    const canvas = document.createElement('canvas'); canvas.width = Math.round(TYPE.width * scale); canvas.height = Math.round(TYPE.height * scale);
     const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
     // UVs run outwards from the sewn edge on both faces of a leaf. Printing a
     // verso in reverse texture coordinates makes the visible text read LTR.
-    if (Math.abs(index % 2) === 1) { ctx.translate(TYPE.width, 0); ctx.scale(-1, 1); }
+    if (mirrored) { ctx.translate(TYPE.width, 0); ctx.scale(-1, 1); }
     ctx.drawImage(backgrounds[seed], 0, 0, TYPE.width, TYPE.height);
     drawPageOrnaments(ctx, TYPE.width, TYPE.height);
-    ctx.font = font; ctx.fontKerning = 'none'; ctx.fillStyle = '#302e2a'; ctx.textBaseline = 'alphabetic';
-    for (const [row, line] of (pages[index]?.lines || []).entries()) {
-      let x = line.x, column = 0;
-      // A typewriter advances a fixed carriage: keep ordinary spaces and a
-      // ragged right edge instead of stretching words to justify each line.
-      for (const { segment } of graphemes.segment(line.text)) {
-        const strike = index * 7919 + row * 131 + column++;
-        ctx.globalAlpha = .81 + ribbonPressure(strike) * .18;
-        const baseline = (ribbonPressure(strike + 4421) - .5) * .65;
-        ctx.fillText(segment, x, line.y + baseline);
-        x += ctx.measureText(segment).width;
-      }
-    }
-    // Let a small amount of the actual paper mottling show through the ink.
-    ctx.globalAlpha = .055; ctx.drawImage(backgrounds[seed], 0, 0, TYPE.width, TYPE.height); ctx.globalAlpha = 1;
     const material = paper[seed].clone();
+    if (printed) {
+      const ink = createInkLayer(pages[index], index, scale, paper[seed].bumpMap.image);
+      // Slight capillary spread stays beneath the sharp, broken impressions.
+      ctx.save(); ctx.globalAlpha = .17; ctx.filter = `blur(${.35 * scale}px)`;
+      ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height); ctx.restore();
+      ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height);
+      material.bumpMap = new THREE.CanvasTexture(createImpressedPaper(paperHeights[seed], ink, mirrored));
+      material.userData.printedBump = true;
+    }
     material.map = new THREE.CanvasTexture(canvas); material.map.colorSpace = THREE.SRGBColorSpace;
     material.map.anisotropy = 8; material.name = `printed-page-${index + 1}`;
     cache.set(index, material); return material;
@@ -65,9 +52,10 @@ export async function createBookPages(paper, source) {
     prune(active) {
       // Keep only a few neighbouring leaves on the GPU, even for long books.
       for (const [index, material] of cache) {
-        if (cache.size <= 8) break;
+        if (cache.size <= 6) break;
         if (active.has(index)) continue;
-        material.map.dispose(); material.dispose(); cache.delete(index);
+        material.map.dispose(); if (material.userData.printedBump) material.bumpMap.dispose();
+        material.dispose(); cache.delete(index);
       }
     },
   };

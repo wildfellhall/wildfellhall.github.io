@@ -113,11 +113,22 @@ test('double-click reads the book full screen without turning a page and restore
   assert.equal(await page.evaluate(() => document.fullscreenElement?.id), 'room');
   assert.equal(await page.locator('#room').getAttribute('data-book-page'), '0');
   assert.equal(await page.locator('#book-transcript section').textContent(), passages[0]);
-  assert.equal(await page.evaluate(() => document.fonts.check('34px "Courier Prime"', 'Éléonore')), true);
+  assert.equal(await page.evaluate(() => [...document.fonts].some(face =>
+    face.family.replaceAll('"', '') === 'Wildfell Typewriter' && face.status === 'loaded')), true);
   assert.ok(await page.evaluate(() => {
-    const ctx = document.createElement('canvas').getContext('2d'); ctx.font = '34px "Courier Prime"';
+    const ctx = document.createElement('canvas').getContext('2d'); ctx.font = '34px "Wildfell Typewriter"';
     return Math.abs(ctx.measureText('iiiii').width - ctx.measureText('WWWWW').width) < .01;
   }), 'The loaded typewriter face must retain a fixed character pitch');
+  assert.ok(await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 800; canvas.height = 160;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.font = '100px "Wildfell Typewriter"'; ctx.fontKerning = 'none'; ctx.fillText('eeeeee', 10, 120);
+    const shaped = ctx.getImageData(0, 0, 800, 160).data; ctx.clearRect(0, 0, 800, 160);
+    let x = 10; for (const glyph of 'eeeeee') { ctx.fillText(glyph, x, 120); x += ctx.measureText(glyph).width; }
+    const repeated = ctx.getImageData(0, 0, 800, 160).data;
+    let differences = 0; for (let i = 3; i < shaped.length; i += 4) if (Math.abs(shaped[i] - repeated[i]) > 20) differences++;
+    return differences > 400;
+  }), 'Whole text runs must use the alternate impressions, not six identical glyphs');
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   const reader = await page.screenshot({ path: 'test-results/book-reader-desktop.png' });
   const wood = await sharp(reader).extract({ left: 12, top: 180, width: 40, height: 140 }).stats();
