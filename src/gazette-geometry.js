@@ -30,12 +30,12 @@ export function bendGazette(geometry, openness) {
       const t = row / ROWS;
       if (row) {
         const v = (row - .5) / ROWS;
-        const shoulder = THREE.MathUtils.smoothstep(v, .488 + .008 * u, .55 + .008 * u);
-        const loose = fold * (Math.PI - .06 - .025 * Math.sin(u * Math.PI)) * shoulder;
-        const cockle = .055 * Math.sin(v * 17 + u * 8) + .025 * Math.sin(v * 34 - u * 11);
-        const edgeCurl = .40 * Math.exp(-v * 35) * Math.sin(u * 5 + 1)
-          - .42 * Math.exp(-(1 - v) * 28) * Math.sin(u * 4 + .4);
-        const creaseMemory = .18 * Math.exp(-(((v - .52) / .045) ** 2)) * Math.sin((v - .52) * 52) * openness;
+        const shoulder = THREE.MathUtils.smoothstep(v, .49 + .004 * u, .538 + .004 * u);
+        const loose = fold * (Math.PI - .035 - .016 * Math.sin(u * Math.PI)) * shoulder;
+        const cockle = .014 * Math.sin(v * 13 + u * 5) + .006 * Math.sin(v * 31 - u * 8);
+        const edgeCurl = .17 * Math.exp(-v * 42) * Math.sin(u * 5 + 1)
+          - .20 * Math.exp(-(1 - v) * 37) * Math.sin(u * 4 + .4);
+        const creaseMemory = .075 * Math.exp(-(((v - .516) / .03) ** 2)) * Math.sin((v - .516) * 64) * openness;
         const angle = loose + cockle + edgeCurl + creaseMemory;
         z += Math.cos(angle) * step; y += Math.sin(angle) * step;
       }
@@ -43,14 +43,14 @@ export function bendGazette(geometry, openness) {
       // outline is a cut edge, not a mechanically perfect rectangle.
       const edge = Math.abs(u - .5) * 2;
       const dx = edge ** 12 * (.003 * Math.sin(t * 89 + col) + .0018 * Math.sin(t * 237));
-      p.setXYZ(row * (COLS + 1) + col, x + dx, y + .012 * Math.sin(u * 9), z);
+      p.setXYZ(row * (COLS + 1) + col, x + dx, y + .004 * Math.sin(u * 9), z);
     }
   }
   // Keep all points above the timber while allowing the loose folded flap
   // to lift naturally. Offset is common to the whole continuous sheet.
   let min = Infinity;
   for (let i = 0; i < p.count; i++) min = Math.min(min, p.getY(i));
-  for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) - min + .022);
+  for (let i = 0; i < p.count; i++) p.setY(i, p.getY(i) - min + .008);
   p.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingBox(); geometry.computeBoundingSphere();
 }
 
@@ -59,7 +59,7 @@ export function bendGazette(geometry, openness) {
 // the shoulder. Tiny staggered cut edges remain visible when unfolded.
 export function offsetGazetteLayer(target, source, layer, openness) {
   const p = target.attributes.position, base = source.attributes.position, normals = source.attributes.normal;
-  const separation = .017 * layer, point = new THREE.Vector3(), normal = new THREE.Vector3();
+  const separation = .0065 * layer, point = new THREE.Vector3(), normal = new THREE.Vector3();
   for (let i = 0; i < p.count; i++) {
     point.fromBufferAttribute(base, i); normal.fromBufferAttribute(normals, i);
     point.addScaledVector(normal, separation);
@@ -67,10 +67,10 @@ export function offsetGazetteLayer(target, source, layer, openness) {
     // Let the free cut edges fan out, but keep the gathered shoulder aligned.
     // Sliding whole sheets along z would make adjacent folds cross each other.
     const freeEdge = THREE.MathUtils.smoothstep(Math.abs(v - .48), .10, .32);
-    point.x += layer * .032 * (.35 + .65 * freeEdge);
-    point.z += layer * .054 * freeEdge;
+    point.x += layer * .012 * freeEdge;
+    point.z += layer * .018 * freeEdge;
     // The cut corners relax independently without separating the fold.
-    point.y += layer * .0012 * Math.sin(u * 8 + v * 6) * openness;
+    point.y += layer * .0005 * Math.sin(u * 8 + v * 6) * openness * freeEdge;
     p.setXYZ(i, point.x, point.y, point.z);
   }
   p.needsUpdate = true; target.computeVertexNormals(); target.computeBoundingBox(); target.computeBoundingSphere();
@@ -84,7 +84,7 @@ export function createGazetteEdge(geometry) {
   for (let y = rows - 2; y > 0; y--) boundary.push(y * cols);
   boundary.push(0);
   const curve = new THREE.CatmullRomCurve3(boundary.map(i => new THREE.Vector3().fromBufferAttribute(p, i)));
-  return new THREE.TubeGeometry(curve, boundary.length, .0022, 4, false);
+  return new THREE.TubeGeometry(curve, boundary.length, .0009, 4, false);
 }
 
 export function createLooseTwine() {

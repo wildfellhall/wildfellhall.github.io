@@ -73,17 +73,17 @@ export function wrapText(text, width, measure) {
 // Printer's units on a 1400 × 1900 broadsheet. A four-page edition has a
 // front page, further articles, a literary page and a miscellany page.
 // Continuations are inserted immediately after their original page.
-export const GAZETTE_TYPE = Object.freeze({ width: 1400, height: 1900, fontSize: 27, leading: 31, bottom: 1750 });
+export const GAZETTE_TYPE = Object.freeze({ width: 1400, height: 1900, fontSize: 26, leading: 30, bottom: 1750 });
 export const EDITION = Object.freeze([
-  { name: 'Articles', sections: [{ id: 'article-1', x: 78, width: 810, columns: 2, headline: 52 },
-    { id: 'article-2', x: 934, width: 388, columns: 1, headline: 38 }] },
-  { name: 'Articles & Correspondence', sections: [{ id: 'article-3', x: 78, width: 1244, columns: 3, headline: 52 }] },
-  { name: 'The Literary Cabinet', sections: [{ id: 'thought-a-day', x: 78, width: 388, columns: 1, headline: 38 },
-    { id: 'words-of-the-week', x: 512, width: 810, columns: 2, headline: 44 }] },
-  { name: 'Notices & Miscellany', sections: [{ id: 'miscellaneous', x: 78, width: 1244, columns: 3, headline: 52 }] },
+  { name: 'Articles', sections: [{ id: 'article-1', x: 78, width: 810, columns: 2, headline: 35 },
+    { id: 'article-2', x: 934, width: 388, columns: 1, headline: 31 }] },
+  { name: 'Articles & Correspondence', sections: [{ id: 'article-3', x: 78, width: 1244, columns: 3, headline: 35 }] },
+  { name: 'The Literary Cabinet', sections: [{ id: 'thought-a-day', x: 78, width: 388, columns: 1, headline: 31 },
+    { id: 'words-of-the-week', x: 512, width: 810, columns: 2, headline: 35 }] },
+  { name: 'Notices & Miscellany', sections: [{ id: 'miscellaneous', x: 78, width: 1244, columns: 3, headline: 35 }] },
 ]);
 
-export function paginateGazette(issue, measure, titleMeasure) {
+export function paginateGazette(issue, measure, titleMeasure, compose = wrapText) {
   const pages = [];
   for (const [templateIndex, template] of EDITION.entries()) {
     const stories = template.sections.map(area => {
@@ -94,22 +94,22 @@ export function paginateGazette(issue, measure, titleMeasure) {
       const subtitles = wrapText(section.subtitle, area.width - 28, measure);
       const bylines = wrapText(section.byline, area.width - 28, measure);
       return { ...section, ...area, columnWidth, titles, subtitles, bylines,
-        remaining: wrapText(section.body, columnWidth, measure), used: false };
+        remaining: compose(section.body, columnWidth, measure), used: false };
     });
     let continuation = false;
     do {
-      const front = templateIndex === 0 && !continuation, top = front ? 720 : 310;
+      const front = templateIndex === 0 && !continuation, top = front ? 540 : 202;
       const sections = stories.filter(s => !s.used || s.remaining.length).map(story => {
         const continued = story.used;
-        const headerHeight = 74 + story.titles.length * (story.headline + 8)
-          + story.subtitles.length * 33 + story.bylines.length * 29 + (continued ? 33 : 0);
+        const headerHeight = 42 + story.titles.length * (story.headline + 5)
+          + story.subtitles.length * 30 + story.bylines.length * 27 + (continued ? 28 : 0);
         const bodyY = top + headerHeight;
         const capacity = Math.floor((GAZETTE_TYPE.bottom - 45 - bodyY) / GAZETTE_TYPE.leading);
         if (capacity < 3) throw new Error(`The heading for ${story.label} is too long. Shorten its title, subtitle or byline.`);
         const columns = Array.from({ length: story.columns }, () => story.remaining.splice(0, capacity));
         story.used = true;
         return { ...story, remaining: undefined, top, bodyY, columns, continued,
-          lines: columns.flat(), continues: story.remaining.length > 0 };
+          lines: columns.flat().map(line => typeof line === 'string' ? line : line.text), continues: story.remaining.length > 0 };
       });
       pages.push({ name: template.name, front, sections }); continuation = true;
     } while (stories.some(story => story.remaining.length));

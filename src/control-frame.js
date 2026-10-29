@@ -14,8 +14,8 @@ function roundedRectangle(width, height, radius) {
   return s;
 }
 
-function moldingGeometry() {
-  const outline = roundedRectangle(284, 50, 9), segments = 384;
+function moldingGeometry(width, height) {
+  const outline = roundedRectangle(width, height, 9), segments = Math.ceil((width + height) * 1.2);
   // A closed section: sight edge, round bead, hollow, broad ovolo and outer
   // lip. Every highlight comes from its surface normal, including the corners.
   const profile = [[-5.8, -1.8], [-5.8, .9], [-5.5, 1.5], [-5.0, 1.8], [-4.5, 1.6],
@@ -79,17 +79,21 @@ function metalTexture() {
   return texture;
 }
 
-export function createFrameMetalwork() {
+export function createFrameMetalwork({ width = 284, height = 50, portrait = false } = {}) {
+  const dx = (width - 284) / 2, dy = (height - 50) / 2;
+  const placeX = x => x + (Math.abs(x) > 105 ? Math.sign(x) * dx : 0);
+  const placeY = y => y + Math.sign(y) * dy;
   const texture = metalTexture();
   // The desk's chased brass is #9c7844, metalness .84, roughness .39.
   const brass = new THREE.MeshStandardMaterial({ color: '#9c7844', metalness: .84,
     roughness: .61, roughnessMap: texture, bumpMap: texture, bumpScale: .018 });
   const polished = brass.clone(); polished.roughness = .46;
   const group = new THREE.Group(); group.name = 'cast-brass-picture-frame'; group.position.y = -1;
-  const molding = new THREE.Mesh(moldingGeometry(), brass); molding.name = 'continuous-cast-molding';
+  const molding = new THREE.Mesh(moldingGeometry(width, height), brass); molding.name = 'continuous-cast-molding';
   group.add(molding);
   const relief = [];
-  function add(geometry, x = 0, y = 0, z = 0, angle = 0, sx = 1, sy = 1, sz = 1) {
+  function add(geometry, x = 0, y = 0, z = 0, angle = 0, sx = 1, sy = 1, sz = 1, placed = false) {
+    if (!placed) { x = placeX(x); y = placeY(y); }
     geometry.scale(sx, sy, sz); geometry.rotateZ(angle); geometry.translate(x, y, z);
     if (geometry.index) { const flat = geometry.toNonIndexed(); geometry.dispose(); geometry = flat; }
     const positions = geometry.attributes.position, uv = geometry.attributes.uv;
@@ -97,9 +101,9 @@ export function createFrameMetalwork() {
     for (let i = 0; i < positions.count; i++) uv.setXY(i, positions.getX(i) / 32, positions.getY(i) / 32);
     relief.push(geometry);
   }
-  function stem(points, radius = .55) {
-    const curve = new THREE.CatmullRomCurve3(points.map(p => new THREE.Vector3(...p)));
-    add(new THREE.TubeGeometry(curve, 36, radius, 10, false));
+  function stem(points, radius = .55, placed = false) {
+    const curve = new THREE.CatmullRomCurve3(points.map(([x, y, z]) => new THREE.Vector3(placed ? x : placeX(x), placed ? y : placeY(y), z)));
+    add(new THREE.TubeGeometry(curve, 36, radius, 10, false), 0, 0, 0, 0, 1, 1, 1, true);
   }
   // Reflect the ornament's placement, not its mesh: the relief keeps outward
   // facing normals and catches the same light on all four sides of the frame.
@@ -158,9 +162,24 @@ export function createFrameMetalwork() {
     }
     add(new THREE.SphereGeometry(1, 16, 12), 0, sy * 28, 3.25, 0, 2.0, 1.25, 1.0);
   }
+  if (portrait) {
+    // Build ornament at its actual size along the vertical rails. Stretching
+    // the horizontal control frame would flatten leaves and smear highlights.
+    for (const side of [-1, 1]) for (const centre of [-height * .22, height * .22]) {
+      const x = side * width / 2;
+      stem([[x, centre - 31, 3], [x + side * 3, centre - 17, 3.5],
+        [x - side * 2, centre, 3.5], [x + side * 3, centre + 18, 3.4],
+        [x + side * 1, centre + 29, 3.5], [x - side * 3, centre + 26, 3.4],
+        [x - side * 2, centre + 22, 3.1]], .55, true);
+      for (const [y, angle] of [[-21, 1.1], [-5, 1.9], [9, 1.2], [20, -1.9]]) {
+        add(leafGeometry(13, 2.4, 1.6), x, centre + y, 2.9,
+          side === 1 ? angle : Math.PI - angle, 1, 1, 1, true);
+      }
+    }
+  }
   const carving = new THREE.Mesh(mergeGeometries(relief), brass); carving.name = 'cast-acanthus-and-scrollwork';
   relief.forEach(g => g.dispose()); group.add(carving);
-  const beadOutline = roundedRectangle(274, 40.2, 5.5);
+  const beadOutline = roundedRectangle(width - 10, height - 9.8, 5.5);
   const beadCount = Math.round(beadOutline.getLength() / 3.5);
   const beads = new THREE.InstancedMesh(new THREE.SphereGeometry(.6, 10, 8), polished, beadCount);
   beads.name = 'inner-bead-molding';
@@ -172,7 +191,7 @@ export function createFrameMetalwork() {
   group.add(beads);
   // Fine diagonal chasing sits in the outer lip, below the foliate relief.
   // Instancing keeps this continuous perimeter detail to a single draw call.
-  const chasedOutline = roundedRectangle(294, 60, 14), chaseCount = Math.round(chasedOutline.getLength() / 2.15);
+  const chasedOutline = roundedRectangle(width + 10, height + 10, 14), chaseCount = Math.round(chasedOutline.getLength() / 2.15);
   const chasing = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), brass, chaseCount);
   chasing.name = 'chased-outer-fillet';
   const rotation = new THREE.Quaternion(), axis = new THREE.Vector3(0, 0, 1), scale = new THREE.Vector3(.85, .28, .26);
@@ -186,7 +205,7 @@ export function createFrameMetalwork() {
   return group;
 }
 
-export async function createControlFrame(host) {
+export async function createControlFrame(host, { portrait = false } = {}) {
   const canvas = host.querySelector('canvas');
   const linen = await new THREE.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}materials/control-linen.webp`);
   // This small transparent canvas has its own context; the desk's compositor
@@ -207,14 +226,24 @@ export async function createControlFrame(host) {
     room.dispose(); pmrem.dispose();
   }
   refreshEnvironment();
-  const metalwork = createFrameMetalwork(); scene.add(metalwork);
+  let metalwork = createFrameMetalwork(); scene.add(metalwork);
   linen.colorSpace = THREE.SRGBColorSpace; linen.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   linen.wrapS = linen.wrapT = THREE.RepeatWrapping; linen.repeat.set(1 / 256, 1 / 128);
   const backing = new THREE.Mesh(new THREE.ShapeGeometry(roundedRectangle(274, 43, 4), 24),
     new THREE.MeshStandardMaterial({ map: linen, color: '#fffdf6', roughness: 1 }));
   backing.position.set(0, -1, -1.4); backing.receiveShadow = true; scene.add(backing);
+  function fitPortrait(width, height) {
+    const old = metalwork; scene.remove(old);
+    disposeMeshes(old);
+    metalwork = createFrameMetalwork({ width: width - 42, height: height - 44, portrait: true }); scene.add(metalwork);
+    backing.geometry.dispose(); backing.geometry = new THREE.ShapeGeometry(roundedRectangle(width - 52, height - 51, 4), 24);
+    camera.left = -width / 2; camera.right = width / 2; camera.top = height / 2; camera.bottom = -height / 2;
+    camera.updateProjectionMatrix();
+    Object.assign(key.shadow.camera, { left: -width, right: width, top: height, bottom: -height });
+    key.shadow.camera.updateProjectionMatrix();
+  }
   const key = new THREE.DirectionalLight('#fff0d6', 3.05); key.position.set(-110, 140, 180);
-  key.castShadow = true; key.shadow.mapSize.set(1024, 512);
+  key.castShadow = true; key.shadow.mapSize.set(1024, portrait ? 1024 : 512);
   Object.assign(key.shadow.camera, { left: -180, right: 180, top: 100, bottom: -100, near: .5, far: 600 });
   key.shadow.bias = -.0001; key.shadow.normalBias = .1; key.shadow.radius = 3;
   const sky = new THREE.HemisphereLight('#e9edf1', '#8d7561', .42);
@@ -225,11 +254,13 @@ export async function createControlFrame(host) {
   let light = 0, renderedLight = -1, width = 0, height = 0, available = true, dirty = true;
   function render(value = light) {
     light = value;
-    if (!available || host.hidden) return;
+    if (!available || host.hidden || portrait && !host.open) return;
     const rect = host.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
     if (width !== rect.width || height !== rect.height) {
-      width = rect.width; height = rect.height; renderer.setSize(width, height, false); dirty = true;
+      width = rect.width; height = rect.height; renderer.setSize(width, height, false);
+      if (portrait) fitPortrait(width, height);
+      dirty = true;
     }
     if (!dirty && Math.abs(light - renderedLight) < .001) return;
     key.color.copy(afternoon).lerp(evening, light); key.intensity = 3.05 - light * .95;
@@ -252,18 +283,23 @@ export async function createControlFrame(host) {
   function dispose() {
     observer.disconnect(); available = false; host.classList.remove('has-metal-frame');
     canvas.removeEventListener('webglcontextlost', loseContext); canvas.removeEventListener('webglcontextrestored', restoreContext);
-    const geometries = new Set(), materials = new Set(), textures = new Set();
-    scene.traverse(object => {
-      if (!object.isMesh) return;
-      geometries.add(object.geometry); materials.add(object.material);
-    });
-    for (const material of materials) {
-      for (const key of ['map', 'roughnessMap', 'bumpMap']) if (material[key]) textures.add(material[key]);
-      material.dispose();
-    }
-    for (const geometry of geometries) geometry.dispose();
-    for (const texture of textures) texture.dispose();
+    disposeMeshes(scene);
     environment.dispose(); renderer.dispose();
   }
   return { render, dispose };
+}
+
+function disposeMeshes(root) {
+  const geometries = new Set(), materials = new Set(), textures = new Set();
+  root.traverse(object => {
+    if (!object.isMesh) return;
+    geometries.add(object.geometry); materials.add(object.material);
+    if (object.isInstancedMesh) object.dispose();
+  });
+  for (const material of materials) {
+    for (const key of ['map', 'roughnessMap', 'bumpMap']) if (material[key]) textures.add(material[key]);
+    material.dispose();
+  }
+  for (const geometry of geometries) geometry.dispose();
+  for (const texture of textures) texture.dispose();
 }

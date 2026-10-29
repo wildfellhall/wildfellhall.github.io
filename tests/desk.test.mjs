@@ -418,7 +418,7 @@ test('browsers without WebGL show the matching still desk', async () => {
     return { width: image.naturalWidth, source: image.currentSrc };
   });
   assert.ok(still.width > 0);
-  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-2$/);
+  assert.match(still.source, /desk-still-portrait\.webp\?v=gazette-3$/);
   assert.equal(await page.locator('.desk-controls').isVisible(), false);
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   assert.equal(await page.locator('#book-controls').isVisible(), false);
@@ -428,7 +428,7 @@ test('browsers without WebGL show the matching still desk', async () => {
   await page.waitForFunction(() => document.querySelector('#desk-fallback img').currentSrc.includes('desk-still-wide.webp'));
   assert.match(await page.locator('#desk-fallback img').evaluate(async image => {
     await image.decode(); return image.currentSrc;
-  }), /desk-still-wide\.webp\?v=gazette-2$/);
+  }), /desk-still-wide\.webp\?v=gazette-3$/);
   await page.screenshot({ path: 'test-results/fallback-wide.png' });
   await page.close();
 });
@@ -438,7 +438,7 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   const original = await readFile('public/gazette/issues/2026-10-29.txt', 'utf8');
-  const older = original.replaceAll('2026-10-29', '2026-10-28').replace('[article-1]\ntitle:\nbyline:\n',
+  const older = original.replaceAll('2026-10-29', '2026-10-28').replace(/\[article-1\]\ntitle:\n(?:subtitle:\n)?byline:[^\n]*\n/,
     '[article-1]\ntitle: An archived letter\nsubtitle: From the reading room\nbyline: A reader\n\n' + 'An entirely editable newspaper article. '.repeat(160) + '\n\n');
   await page.route('**/gazette/index.json', route => route.fulfill({json: [
     { date: '2026-10-29', label: '29 October 2026' }, { date: '2026-10-28', label: '28 October 2026' },
@@ -451,7 +451,8 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   await page.locator('#room[data-gazette-phase="open"]').waitFor();
   assert.equal(await page.locator('#room').getAttribute('data-gazette-reading'), 'false');
   assert.equal(await page.locator('#gazette-transcript h3').count(), 6);
-  assert.equal(await page.locator('#gazette-transcript p').count(), 0, 'The published first issue has no fabricated article text');
+  const suppliedBylines = [...original.matchAll(/^byline: *(.+)$/gm)].map(match => match[1]);
+  assert.deepEqual(await page.locator('#gazette-transcript p').allTextContents(), suppliedBylines, 'Preserve supplied bylines without inventing article prose');
   await page.screenshot({path: 'test-results/gazette-unfolded-desktop.png'});
   await page.getByRole('button', {name: 'Read Gazette full screen', exact: true}).click();
   await page.locator('#room[data-gazette-reading="true"]').waitFor();
@@ -465,6 +466,8 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   assert.equal(await page.getByRole('button', {name: 'Next Gazette sheet'}).isDisabled(), true);
   await page.screenshot({path: 'test-results/gazette-fourth-page.png'});
   await page.getByRole('button', {name: 'Browse Gazette by date'}).click();
+  await page.locator('#gazette-archive.has-metal-frame').waitFor();
+  await page.screenshot({path: 'test-results/gazette-archive-desktop.png'});
   await page.getByRole('button', {name: '28 October 2026', exact: true}).click();
   await page.getByText('This issue could not be loaded. Please try again.', {exact: true}).waitFor();
   assert.equal(await page.locator('#room').getAttribute('data-gazette-date'), '2026-10-29');
@@ -502,6 +505,9 @@ test('touch unfolds the loose Gazette, enters reading only with its control, and
   await page.screenshot({path: 'test-results/gazette-reader-mobile.png'});
   await page.getByRole('button', {name: 'Zoom in', exact: true}).tap();
   await page.getByRole('button', {name: 'Browse Gazette by date'}).tap();
+  await page.locator('#gazette-archive.has-metal-frame').waitFor();
+  await page.screenshot({path: 'test-results/gazette-archive-mobile.png'});
+  assert.equal(await page.locator('#gazette-archive').evaluate(dialog => dialog.scrollWidth <= dialog.clientWidth), true);
   await page.getByRole('button', {name: '29 October 2026', exact: true}).tap();
   await page.getByRole('button', {name: 'Return to desk', exact: true}).tap();
   await page.locator('#room[data-gazette-reading="false"]').waitFor();
@@ -522,6 +528,8 @@ test('the Gazette date archive and readable sections work without WebGL', async 
   await page.getByRole('button', {name: '29 October 2026', exact: true}).click();
   await page.locator('#gazette-fallback-text h3').first().waitFor();
   assert.equal(await page.locator('#gazette-fallback-text h3').count(), 6);
+  assert.equal(await page.locator('#gazette-archive').evaluate(dialog => dialog.classList.contains('has-metal-frame')), false);
+  await page.screenshot({path: 'test-results/gazette-archive-fallback.png'});
   await page.keyboard.press('Escape'); assert.equal(await page.locator('#gazette-archive').isVisible(), false);
   await page.close();
 });

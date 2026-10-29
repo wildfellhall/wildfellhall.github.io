@@ -7,12 +7,14 @@ import * as THREE from 'three';
 import { parseGazette, paginateGazette, validDate, wrapText } from '../src/gazette-text.js';
 import { gazetteCatalog } from '../scripts/gazette-catalog.mjs';
 import { createGazetteGeometry, bendGazette, offsetGazetteLayer, GAZETTE_DEPTH } from '../src/gazette-geometry.js';
-const source = await readFile(new URL('../public/gazette/issues/2026-10-29.txt', import.meta.url), 'utf8');
+import { composeGazetteText } from '../src/gazette-composition.js';
+const published = await readFile(new URL('../public/gazette/issues/2026-10-29.txt', import.meta.url), 'utf8');
+const source = published.replace(/^byline:.*$/gm, 'byline:');
 
-test('first issue and template contain six empty editable sections, with a real date', async () => {
-  const issue = parseGazette(source, '2026-10-29');
+test('first issue preserves supplied metadata and six empty prose sections, with a real date', async () => {
+  const issue = parseGazette(published, '2026-10-29');
   assert.equal(issue.number, '1'); assert.equal(issue.sections.length, 6);
-  assert.ok(issue.sections.every(section => !section.title && !section.byline && !section.body));
+  assert.ok(issue.sections.every(section => !section.title && !section.body));
   const template = (await readFile(new URL('../public/gazette/template.txt', import.meta.url), 'utf8')).replace('date: YYYY-MM-DD', 'date: 2028-02-29');
   assert.equal(parseGazette(template).date, '2028-02-29');
   for (const date of ['2026-02-29', '2026-13-01', '2026-00-00', 'today', '0000-01-01']) assert.equal(validDate(date), false);
@@ -43,6 +45,29 @@ test('long Gazette sections continue across sheets without losing words or split
   assert.equal(wrapText(unicode, 40, s => Array.from(s).length * 10).join(''), unicode);
 });
 
+test('British paragraph composition fits columns and preserves words across hyphenated continuations', () => {
+  const paragraph = 'The morning correspondence continues with literary observations and descriptions of the neighbourhood.';
+  const measure = text => Array.from(text).length * 11;
+  const lines = composeGazetteText(`${paragraph}\n\n${paragraph}`, 205, measure);
+  assert.equal(lines.filter(line => line.paragraphStart).length, 2);
+  assert.equal(lines.filter(line => line.paragraphEnd).length, 2);
+  assert.ok(lines.some(line => line.text.endsWith('-')), 'Narrow columns should use legal hyphenation points');
+  const restored = lines.map(line => line.text.endsWith('-') ? line.text.slice(0, -1) : line.text + ' ').join('').trim();
+  assert.equal(restored, `${paragraph} ${paragraph}`);
+  for (const line of lines) for (const run of line.runs) {
+    assert.ok(run.x >= 0 && run.x + run.width <= 205.05, 'Text must fit the actual column measure');
+  }
+  const token = '𝔄é👩'.repeat(90), emergency = composeGazetteText(token, 205, measure);
+  assert.equal(emergency.map(line => line.text.replace(/-$/, '')).join(''), token);
+  assert.ok(emergency.every(line => line.runs.every(run => run.x + run.width <= 205.05)));
+  const issue = parseGazette(source); issue.sections[0].body = Array(250).fill(paragraph).join('\n\n');
+  const pages = paginateGazette(issue, measure, measure, composeGazetteText);
+  assert.ok(pages.length > 4);
+  const continued = pages.flatMap(page => page.sections.filter(s => s.id === 'article-1').flatMap(s => s.columns.flat()));
+  assert.equal(continued.filter(line => line.paragraphStart).length, 250, 'Pagination must retain paragraph indents');
+  assert.equal(continued.filter(line => line.paragraphEnd).length, 250);
+});
+
 test('date catalog discovers new files, sorts newest first, and rejects mismatched or invalid issues', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'wildfell-gazette-'));
   try {
@@ -63,7 +88,7 @@ test('loose newspaper fold remains a continuous length-preserving sheet above th
       let length = 0;
       for (let row = 0; row <= 100; row++) {
         const a = new THREE.Vector3().fromBufferAttribute(p, row * 65 + col);
-        assert.ok(a.y >= .0219, 'No part of the sheet can sink into the timber');
+        assert.ok(a.y >= .0079, 'No part of the sheet can sink into the timber');
         if (row) length += a.distanceTo(new THREE.Vector3().fromBufferAttribute(p, (row - 1) * 65 + col));
       }
       assert.ok(Math.abs(length - GAZETTE_DEPTH) < .015);
@@ -95,7 +120,7 @@ test('empty editions have four distinct pages with accurate contents and enough 
   for (const page of expanded) for (const story of page.sections) {
     if (story.continues) assert.ok(expanded[story.nextPage - 1].sections.some(next => next.id === story.id && next.continued));
     if (story.continued) assert.ok(expanded[story.previousPage - 1].sections.some(previous => previous.id === story.id));
-    assert.ok(story.columns.every(column => story.bodyY + column.length * 31 <= 1750));
+    assert.ok(story.columns.every(column => story.bodyY + column.length * 30 <= 1750));
   }
 });
 
@@ -115,9 +140,9 @@ test('nested newspaper leaves keep their rounded-fold spacing and remain above t
         const separation = new THREE.Vector3().fromBufferAttribute(p, i).sub(new THREE.Vector3().fromBufferAttribute(q, i));
         // Remove the deliberate edge stagger, leaving the nested fold gap.
         const v = base.attributes.uv.getY(i), freeEdge = THREE.MathUtils.smoothstep(Math.abs(v - .48), .10, .32);
-        separation.x -= .032 * (.35 + .65 * freeEdge); separation.z -= .054 * freeEdge;
+        separation.x -= .012 * freeEdge; separation.z -= .018 * freeEdge;
         const normal = new THREE.Vector3().fromBufferAttribute(base.attributes.normal, i);
-        assert.ok(separation.dot(normal) > .015, 'Adjacent paper surfaces must not collapse into each other');
+        assert.ok(separation.dot(normal) > .0055, 'Adjacent paper surfaces must not collapse into each other');
       }
       const mesh = new THREE.Mesh(layers[index], new THREE.MeshBasicMaterial({side: THREE.DoubleSide}));
       mesh.updateMatrixWorld();

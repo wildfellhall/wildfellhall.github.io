@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createGazetteGeometry, bendGazette, offsetGazetteLayer, createGazetteEdge, createLooseTwine, GAZETTE_WIDTH, GAZETTE_DEPTH } from './gazette-geometry.js';
 import { createGazettePrinting, loadGazetteFonts } from './gazette-print.js';
 import { parseGazette, dateLabel } from './gazette-text.js';
+import { createControlFrame } from './control-frame.js';
 
 const base = `${import.meta.env.BASE_URL}gazette/`;
 async function fetchText(file) {
@@ -25,7 +26,7 @@ export async function createGazette(surfaceY, maxTextureSize = 4096) {
   const group = new THREE.Group(); group.name = 'wildfell-gazette';
   group.position.set(-3.9, surfaceY + .007, .25); group.rotation.y = .105; group.scale.setScalar(.86);
   const geometry = createGazetteGeometry();
-  const edgeMaterial = new THREE.MeshStandardMaterial({ color: '#c2b69d', roughness: 1 });
+  const edgeMaterial = new THREE.MeshStandardMaterial({ color: '#d6ceba', roughness: 1 });
   // Four independently shaded leaves (eight exposed faces in the loose fold)
   // give even an empty edition a real gathered edge. Small textures on the
   // covered leaves reserve high-resolution ink for the page being read.
@@ -126,12 +127,21 @@ export function connectArchive({ gazette, invalidate = () => {}, status, fallbac
   const dialog = document.querySelector('#gazette-archive'), list = document.querySelector('#gazette-dates');
   const error = document.querySelector('#gazette-archive-error'), transcript = document.querySelector('#gazette-transcript');
   const button = document.querySelector('#gazette-archive-open'), close = document.querySelector('#gazette-archive-close');
-  let returnFocus;
+  let returnFocus, archiveFrame, framePromise;
+  async function renderFrame() {
+    if (fallback) return;
+    try {
+      framePromise ||= createControlFrame(dialog, { portrait: true });
+      archiveFrame = await framePromise;
+      if (dialog.open) archiveFrame.render(document.querySelector('#room').classList.contains('is-evening') ? 1 : 0);
+    } catch { /* The still, rendered from the same casting, remains visible. */ }
+  }
   const dismiss = () => { dialog.close(); returnFocus?.focus({ preventScroll: true }); };
   close.addEventListener('click', dismiss);
   dialog.addEventListener('cancel', event => { event.preventDefault(); dismiss(); });
   button.addEventListener('click', async () => {
     returnFocus = document.activeElement; dialog.showModal(); error.textContent = ''; list.replaceChildren();
+    renderFrame();
     try {
       const catalog = gazette?.catalog || await loadCatalog();
       for (const entry of catalog) {

@@ -33,9 +33,10 @@ export function createPaperStock(seed = 0, newspaper = false) {
     // An almost imperceptible remnant of the paper mould. Neither a fabric
     // grid nor a conspicuous stripe is printed onto the writing area.
     const laid = Math.cos((y + cloud(x / 80, y / 50, seed) * 2) * Math.PI / 3.4);
-    const h = 128 + tooth + pulp * 12 + laid * 1.3;
-    const tone = tooth * .14 + pulp * 3 + broad * 4;
-    pixels.set([239 + tone - age * .6, 234 + tone - age, (newspaper ? 216 : 219) + tone - age * 1.4, 255], i);
+    const h = 128 + tooth * (newspaper ? .57 : 1) + pulp * (newspaper ? 5 : 12) + laid * (newspaper ? .4 : 1.3);
+    const tone = tooth * (newspaper ? .07 : .14) + pulp * (newspaper ? 1.8 : 3) + broad * 4;
+    pixels.set(newspaper ? [239 + tone - age * .45, 234 + tone - age * .7, 221 + tone - age, 255]
+      : [239 + tone - age * .6, 234 + tone - age, 219 + tone - age * 1.4, 255], i);
     heights.set([h, h, h, 255], i);
     const r = 228 + tooth * .35; rough.set([r, r, r, 255], i);
   }
@@ -43,13 +44,13 @@ export function createPaperStock(seed = 0, newspaper = false) {
   // They remain small even at reading magnification, as on real rag paper.
   for (let fibre = 0; fibre < 21000; fibre++) {
     const x = paperNoise(fibre, 1, seed) * size, y = paperNoise(fibre, 2, seed) * size;
-    const angle = paperNoise(fibre, 3, seed) * Math.PI * 2, length = 2 + paperNoise(fibre, 4, seed) * 10;
-    const shade = (paperNoise(fibre, 5, seed) - .52) * 16;
+    const angle = paperNoise(fibre, 3, seed) * Math.PI * 2, length = 2 + paperNoise(fibre, 4, seed) * (newspaper ? 4 : 10);
+    const shade = (paperNoise(fibre, 5, seed) - .52) * (newspaper ? 7 : 16);
     for (let s = 0; s < length; s += .5) {
       const xx = Math.round(x + Math.cos(angle) * s), yy = Math.round(y + Math.sin(angle) * s + Math.sin(s * .5) * .3);
       if (xx < 0 || xx >= size || yy < 0 || yy >= size) continue;
       const i = (yy * size + xx) * 4, taper = Math.sin(Math.PI * s / length);
-      for (let c = 0; c < 3; c++) { pixels[i + c] = Math.min(255, pixels[i + c] + shade * taper); heights[i + c] = Math.min(255, heights[i + c] + 13 * taper); }
+      for (let c = 0; c < 3; c++) { pixels[i + c] = Math.min(255, pixels[i + c] + shade * taper); heights[i + c] = Math.min(255, heights[i + c] + (newspaper ? 7 : 13) * taper); }
     }
   }
   // Restrained oxidation at cut edges, with tiny hard flecks rather than

@@ -12,15 +12,32 @@ export function distressPressInk(canvas, seed, scale, paperHeight) {
     const u = x / scale, v = y / scale;
     // Irregular inking is shared by small patches of a metal sort, rather
     // than lowering the opacity of the entire typeset line uniformly.
-    const pressure = paperNoise(Math.floor(u / 13), Math.floor(v / 8), seed + 3);
+    const pressure = paperNoise(Math.floor(u / 9), Math.floor(v / 6), seed + 3);
     const tooth = paperNoise(Math.floor(u * 2), Math.floor(v * 2), seed + 9);
     const fibre = paperHeight.data[(Math.min(paperHeight.height - 1, Math.floor(y / canvas.height * paperHeight.height)) * paperHeight.width
       + Math.min(paperHeight.width - 1, Math.floor(x / canvas.width * paperHeight.width))) * 4];
-    const contact = tooth < .035 ? .25 : Math.min(1, .92 + (fibre - 124) * .006);
-    p[i + 3] *= (.84 + pressure * .16) * contact;
+    // Most of the impression is solid carbon black. Only high paper fibres
+    // and occasional under-inked sorts interrupt the coverage; the cream
+    // stock must not wash through every letter and turn the type brown.
+    const missedFibre = fibre > 139 && tooth < .11 || tooth < .004;
+    const contact = missedFibre ? .38 : 1;
+    p[i + 3] *= (pressure < .08 ? .89 + pressure : .985) * contact;
   }
   ctx.putImageData(pixels, 0, 0);
-  return spreadInk(canvas, seed, scale);
+  const result = canvasLike(canvas), paint = result.getContext('2d');
+  paint.globalAlpha = .16; paint.filter = `blur(${.22 * scale}px)`;
+  paint.drawImage(canvas, .08 * scale, .04 * scale);
+  // Rare, local press drag, below the sharp impression. This is deliberately
+  // separate from the book's existing typewriter ribbon treatment.
+  paint.filter = `blur(${.3 * scale}px)`; paint.globalAlpha = .13;
+  for (let band = 0, y = 0; y < canvas.height; band++, y += 43 * scale) {
+    if (paperNoise(band, 8, seed) > .09) continue;
+    const x = paperNoise(band, 2, seed) * canvas.width;
+    const w = Math.min(canvas.width - x, 45 * scale), h = Math.min(canvas.height - y, 4 * scale);
+    paint.drawImage(canvas, x, y, w, h, x + .55 * scale, y, w, h);
+  }
+  paint.globalAlpha = 1; paint.filter = 'none'; paint.drawImage(canvas, 0, 0);
+  return result;
 }
 
 export function spreadInk(source, seed, scale, amount = 1) {

@@ -58,7 +58,8 @@ test('all carved relief and edge beads produce finite renderable geometry', () =
 });
 
 test('the cast metal frame has a closed molding and finite relief surfaces', () => {
-  const frame = createFrameMetalwork(), molding = frame.getObjectByName('continuous-cast-molding');
+  for (const options of [{}, {width: 448, height: 416, portrait: true}, {width: 324, height: 310, portrait: true}]) {
+  const frame = createFrameMetalwork(options), molding = frame.getObjectByName('continuous-cast-molding');
   const edges = new Map();
   for (let i = 0; i < molding.geometry.index.count; i += 3) {
     const vertices = [0, 1, 2].map(j => molding.geometry.index.getX(i + j));
@@ -73,6 +74,7 @@ test('the cast metal frame has a closed molding and finite relief surfaces', () 
     for (const key of ['position', 'normal']) assert.ok(object.geometry.attributes[key].array.every(Number.isFinite));
     object.geometry.dispose(); object.material.dispose();
   });
+  }
 });
 
 test('the oval name crest has a closed rim and outward-facing floral relief', () => {
