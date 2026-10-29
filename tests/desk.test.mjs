@@ -113,7 +113,11 @@ test('double-click reads the book full screen without turning a page and restore
   assert.equal(await page.evaluate(() => document.fullscreenElement?.id), 'room');
   assert.equal(await page.locator('#room').getAttribute('data-book-page'), '0');
   assert.equal(await page.locator('#book-transcript section').textContent(), passages[0]);
-  assert.equal(await page.evaluate(() => document.fonts.check('35px "Old Standard TT"', 'Éléonore')), true);
+  assert.equal(await page.evaluate(() => document.fonts.check('34px "Courier Prime"', 'Éléonore')), true);
+  assert.ok(await page.evaluate(() => {
+    const ctx = document.createElement('canvas').getContext('2d'); ctx.font = '34px "Courier Prime"';
+    return Math.abs(ctx.measureText('iiiii').width - ctx.measureText('WWWWW').width) < .01;
+  }), 'The loaded typewriter face must retain a fixed character pitch');
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   const reader = await page.screenshot({ path: 'test-results/book-reader-desktop.png' });
   const wood = await sharp(reader).extract({ left: 12, top: 180, width: 40, height: 140 }).stats();

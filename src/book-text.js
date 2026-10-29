@@ -1,7 +1,7 @@
 // Page coordinates are independent of the viewport, so resizing never moves
 // the reader's place or changes which words belong to a physical leaf.
 export const TYPE = Object.freeze({ width: 1024, height: 1425, left: 154, right: 870,
-  top: 196, fontSize: 35, lineHeight: 46, lines: 23, indent: 35 });
+  top: 196, fontSize: 34, lineHeight: 46, lines: 23, indent: 102 });
 
 export function parseBookText(source) {
   const blocks = [], paragraph = [];

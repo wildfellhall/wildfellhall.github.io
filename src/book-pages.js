@@ -1,17 +1,28 @@
 import * as THREE from 'three';
-import '@fontsource/old-standard-tt/400.css';
+import '@fontsource/courier-prime/400.css';
 import { TYPE, paginateBookText } from './book-text.js';
 import { drawPageOrnaments } from './book-page-ornaments.js';
 import { LEAF_COUNT } from './book-motion.js';
 
-// A revival of the modern serif types used in late nineteenth-century books:
-// https://github.com/akryukov/oldstand (locally served, SIL Open Font License).
+// Fixed-pitch typewriter lettering, locally served under the SIL OFL.
+// Repeatable variations in ribbon pressure keep the ink stable when returning
+// to a page, while letting individual strikes have slightly different weight.
+function ribbonPressure(seed) {
+  let n = Math.imul(seed ^ 1848, 374761393);
+  n = Math.imul(n ^ n >>> 13, 1274126177);
+  return ((n ^ n >>> 16) >>> 0) / 4294967296;
+}
+
 export async function createBookPages(paper, source) {
-  const font = `${TYPE.fontSize}px "Old Standard TT", "Times New Roman", serif`;
+  const font = `${TYPE.fontSize}px "Courier Prime", "Courier New", monospace`;
   try { await document.fonts.load(font, source || 'Aa Éé'); }
-  catch (error) { console.warn('Using the book’s serif fallback:', error); }
+  catch (error) { console.warn('Using the book’s typewriter fallback:', error); }
   const measure = document.createElement('canvas').getContext('2d'); measure.font = font;
+  measure.fontKerning = 'none';
   const pages = paginateBookText(source, text => measure.measureText(text).width);
+  const graphemes = typeof Intl.Segmenter === 'function'
+    ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
+    : { segment: text => Array.from(text.normalize('NFC'), segment => ({ segment })) };
   const cache = new Map();
   const backgrounds = paper.map(material => {
     const { data, width, height } = material.map.image;
@@ -29,15 +40,18 @@ export async function createBookPages(paper, source) {
     if (Math.abs(index % 2) === 1) { ctx.translate(TYPE.width, 0); ctx.scale(-1, 1); }
     ctx.drawImage(backgrounds[seed], 0, 0, TYPE.width, TYPE.height);
     drawPageOrnaments(ctx, TYPE.width, TYPE.height);
-    ctx.font = font; ctx.fillStyle = '#382c24'; ctx.textBaseline = 'alphabetic';
-    for (const line of pages[index]?.lines || []) {
-      const words = line.text.split(' '), available = TYPE.right - line.x;
-      const extra = (available - ctx.measureText(line.text).width) / Math.max(1, words.length - 1);
-      // Tight justified setting, without conspicuous rivers in short lines.
-      if (!line.paragraphEnd && words.length > 1 && extra < TYPE.fontSize * .25) {
-        let x = line.x; const space = ctx.measureText(' ').width + extra;
-        for (const word of words) { ctx.fillText(word, x, line.y); x += ctx.measureText(word).width + space; }
-      } else ctx.fillText(line.text, line.x, line.y);
+    ctx.font = font; ctx.fontKerning = 'none'; ctx.fillStyle = '#302e2a'; ctx.textBaseline = 'alphabetic';
+    for (const [row, line] of (pages[index]?.lines || []).entries()) {
+      let x = line.x, column = 0;
+      // A typewriter advances a fixed carriage: keep ordinary spaces and a
+      // ragged right edge instead of stretching words to justify each line.
+      for (const { segment } of graphemes.segment(line.text)) {
+        const strike = index * 7919 + row * 131 + column++;
+        ctx.globalAlpha = .81 + ribbonPressure(strike) * .18;
+        const baseline = (ribbonPressure(strike + 4421) - .5) * .65;
+        ctx.fillText(segment, x, line.y + baseline);
+        x += ctx.measureText(segment).width;
+      }
     }
     // Let a small amount of the actual paper mottling show through the ink.
     ctx.globalAlpha = .055; ctx.drawImage(backgrounds[seed], 0, 0, TYPE.width, TYPE.height); ctx.globalAlpha = 1;
