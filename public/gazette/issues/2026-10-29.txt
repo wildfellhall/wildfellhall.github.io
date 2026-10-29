@@ -5,7 +5,7 @@ date: 2026-10-29
 number: 1
 
 [article-1]
-title:
+title: Objectives of Wildfell Gazette
 byline: Sanah Rajesh
 
 [article-2]
@@ -21,7 +21,7 @@ title:
 byline: Sanah Rajesh
 
 [words-of-the-week]
-title:
+title: Abstruse Natural Words
 byline: Sanah Rajesh
 
 [miscellaneous]
