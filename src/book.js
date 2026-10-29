@@ -114,7 +114,11 @@ export async function createBook(surfaceY, source = '', maxTextureSize = 4096) {
       turning.position.x = THREE.MathUtils.lerp(.045, -.045, p);
       bendLeaf(turning.geometry, p, sewnHeight(count) + .0007, 1, count * SHEET_STEP);
       for (const [target, index] of [[recto, faces.front], [verso, faces.back]]) {
-        const printed = printing.get(index); target.map = printed.map; target.bumpMap = printed.bumpMap;
+        const printed = printing.get(index);
+        // Printed stock uses its ink-compressed height field. Retaining the
+        // blank stock's normal map would override that field during a turn.
+        if (Boolean(target.normalMap) !== Boolean(printed.normalMap)) target.needsUpdate = true;
+        target.map = printed.map; target.bumpMap = printed.bumpMap; target.normalMap = printed.normalMap;
       }
     }
     printing.prune(new Set([-1, -2, faces.left, faces.right, faces.front, faces.back]));
@@ -174,7 +178,7 @@ export async function createBook(surfaceY, source = '', maxTextureSize = 4096) {
     place(viewWidth, portrait) {
       // Keep the corner object within the cropped writing surface on phones.
       group.position.x = portrait ? .15 : Math.min(4.25, Math.max(.15, viewWidth / 2 - COVER_WIDTH * group.scale.x - .35));
-      group.position.z = portrait ? .65 : -1.55;
+      group.position.z = portrait ? .65 + 1.4 * motion.openness : -1.55;
       group.updateMatrixWorld(true);
     },
     activate(action) {

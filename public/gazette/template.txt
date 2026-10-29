@@ -1,0 +1,43 @@
+# WILDFELL GAZETTE — ISSUE TEMPLATE
+# Copy this file into public/gazette/issues/YYYY-MM-DD.txt.
+# Replace the date below with the same real date as the filename.
+# Set the issue number, or leave number: empty to omit it.
+# Keep all six [section-identifiers] exactly as written.
+# Replace title: and byline: values; blank values use the section heading
+# and omit the byline. Write your prose AFTER the empty line below byline:.
+# Separate paragraphs with an empty line. Ordinary single line breaks wrap.
+# Lines beginning with # are editing notes and never appear in the paper.
+# All other text is literal: HTML and Markdown are not interpreted.
+# For words of the week, use a separate paragraph per word and definition.
+# Long sections continue on further sheets, reached with the reading arrows.
+# Save as UTF-8. Commit/push the new file: GitHub Pages rebuilds the date list
+# automatically. No JSON index or JavaScript changes are needed.
+# To edit an existing issue, edit its dated file instead of this template.
+# This template is outside issues/ and never appears in the archive.
+date: YYYY-MM-DD
+number:
+
+[article-1]
+title:
+byline:
+
+[article-2]
+title:
+byline:
+
+[article-3]
+title:
+byline:
+
+[thought-a-day]
+title:
+byline:
+
+[words-of-the-week]
+title:
+byline:
+
+[miscellaneous]
+title:
+byline:
+

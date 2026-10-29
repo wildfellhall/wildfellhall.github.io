@@ -1,8 +1,9 @@
 import * as THREE from 'three';
+import { connectArchive } from './gazette.js';
 
 // The camera stays square to the furniture. Inspection moves within its image
 // plane, so dragging and zooming cannot tip the desk relative to the carpet.
-export function createDeskInteraction({ canvas, room, camera, desk, book, status, invalidate, resetView }) {
+export function createDeskInteraction({ canvas, room, camera, desk, book, gazette, status, invalidate, resetView }) {
   const zoomIn = document.querySelector('#zoom-in'), zoomOut = document.querySelector('#zoom-out');
   const drawerControls = document.querySelector('#drawer-controls');
   const buttons = [...drawerControls.querySelectorAll('button')];
@@ -12,6 +13,13 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
   const bookClose = document.querySelector('#book-close');
   const bookRead = document.querySelector('#book-read'), viewToggle = document.querySelector('#view-toggle');
   const viewReset = document.querySelector('#view-reset');
+  const gazetteButton = document.querySelector('#gazette-hotspot'), gazetteTools = document.querySelector('#gazette-tools');
+  const gazettePrevious = document.querySelector('#gazette-previous'), gazetteNext = document.querySelector('#gazette-next');
+  let activePublication = 'book', reader = 'book';
+  const readingObject = () => reader === 'gazette' ? gazette : book;
+  const bookCloseIcon = bookClose.innerHTML, bookReadIcon = bookRead.innerHTML;
+  const newspaperIcon = '<svg viewBox="0 0 32 32" fill="none" stroke="currentColor" aria-hidden="true"><path d="M6 5h20v23H6ZM9 9h14M9 12h14M9 16h6v8H9ZM18 16h5m-5 4h5m-5 4h5"/></svg>';
+  let toolbarPublication = 'book';
   const bookButtons = [...bookControls.querySelectorAll('button')];
   const pan = new THREE.Vector2(), pointers = new Map(), raycaster = new THREE.Raycaster();
   const pickMeshes = [];
@@ -21,6 +29,9 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
     if (object.isMesh && object.name !== 'ivory-relief') pickMeshes.push(object);
   });
   book.group.traverse(object => { if (object.isMesh && object.userData.bookPick) pickMeshes.push(object); });
+  gazette?.group.traverse(object => { if (object.isMesh && object.userData.gazettePick) pickMeshes.push(object); });
+  if (gazette) connectArchive({ gazette, invalidate, status });
+  else connectArchive({ invalidate, status, fallback: true });
   let zoom = 1, gesture = null, enabled = false, focusedDrawer = null, focusedBook = null;
   let lastBookPhase = 'closed', lastBookPage = 0;
   let reading = false, deskView = null, ownedFullscreen = false, pendingTap = 0, lastTap = null;
@@ -30,7 +41,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
   function limits() {
     if (reading) {
       const view = visible();
-      return new THREE.Vector2(Math.max(0, (book.width - view.x) / 2 + .12), Math.max(0, (book.depth - view.y) / 2 + .12));
+      return new THREE.Vector2(Math.max(0, (readingObject().width - view.x) / 2 + .12), Math.max(0, (readingObject().depth - view.y) / 2 + .12));
     }
     const view = visible(), cropped = 8.1 - view.x / 2;
     return new THREE.Vector2(cropped > 0 ? Math.min(6.6, cropped + 1.2) : 0, Math.max(0, 6.1 - view.y / 2));
@@ -63,11 +74,14 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
   }
   function readingControls() {
     room.classList.toggle('is-reading', reading);
-    room.dataset.bookReading = String(reading);
+    room.dataset.bookReading = String(reading && reader === 'book');
+    room.dataset.gazetteReading = String(reading && reader === 'gazette');
+    bookControls.hidden = !enabled || (reading && reader !== 'book');
+    gazetteButton.hidden = !enabled || !gazette || (reading && reader !== 'gazette');
     drawerControls.hidden = !enabled || reading;
     bookRead.setAttribute('aria-pressed', String(reading));
-    bookRead.setAttribute('aria-label', reading ? 'Return to desk' : 'Read book full screen');
-    viewReset.setAttribute('aria-label', reading ? 'Fit book to screen' : 'Reset view');
+    bookRead.setAttribute('aria-label', reading ? 'Return to desk' : activePublication === 'gazette' ? 'Read Gazette full screen' : 'Read book full screen');
+    viewReset.setAttribute('aria-label', reading ? `Fit ${reader === 'gazette' ? 'Gazette' : 'book'} to screen` : 'Reset view');
     zoomIn.disabled = zoom >= MAX_ZOOM - .001; zoomOut.disabled = zoom <= MIN_ZOOM + .001;
   }
   function leaveReading() {
@@ -76,14 +90,15 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
     zoom = deskView.zoom; pan.copy(deskView.pan); deskView = null;
     focusedBook = focusedDrawer = null;
     readingControls(); invalidate(); canvas.focus({ preventScroll: true });
-    status.textContent = 'Returned to the desk. Your place in the book is preserved.';
+    status.textContent = 'Returned to the desk. Your reading place is preserved.';
     if (document.fullscreenElement === room) document.exitFullscreen().catch(() => {});
   }
-  function enterReading() {
+  function enterReading(publication = 'book') {
     if (!enabled || reading) return;
-    clearTap(); deskView = { zoom, pan: pan.clone() };
+    clearTap(); reader = activePublication = publication; deskView = { zoom, pan: pan.clone() };
     reading = true; zoom = 1; pan.set(0, 0); focusedBook = focusedDrawer = null;
-    book.motion.open(); readingControls(); invalidate(); canvas.focus({ preventScroll: true });
+    if (reader === 'gazette') gazette.activate('open'); else book.motion.open();
+    readingControls(); invalidate(); canvas.focus({ preventScroll: true });
     status.textContent = 'Full-screen reading view. Click the pages or use the arrow keys to turn them. Press Escape to return to the desk.';
     // The viewport reader also works on browsers that do not offer fullscreen
     // or reject the request. Keep the request within the user's input event.
@@ -99,7 +114,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
     invalidate();
   });
   room.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && reading) {
+    if (event.key === 'Escape' && reading && !document.querySelector('#gazette-archive').open) {
       event.preventDefault(); event.stopPropagation(); leaveReading();
     }
   }, true);
@@ -112,13 +127,15 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
     }), false)[0];
     // Respect occlusion: clicking the top above a closed drawer does nothing.
     for (let object = hit?.object; object; object = object.parent) {
+      if (object.userData.gazettePick) return 'gazette:toggle';
       if (object.userData.bookAction) return `book:${object.userData.bookAction}`;
       if (object.userData.drawerIndex !== undefined) return `drawer:${object.userData.drawerIndex}`;
     }
     return null;
   }
   function activateBook(action) {
-    clearTap();
+    clearTap(); activePublication = 'book';
+    if (action !== 'close') gazette?.activate('close');
     if (reading && (action === 'close' || action === 'toggle' || (action === 'previous' && book.motion.page === 0))) leaveReading();
     if (!enabled || !book.activate(action)) return;
     if (!book.motion.opened || action === 'close') bookButtons[0].focus({ preventScroll: true });
@@ -128,6 +145,17 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
         : 'The Tenant of Wildfell Hall is closing.';
     invalidate();
   }
+  function activateGazette(action) {
+    if (!enabled || !gazette) return;
+    clearTap(); activePublication = 'gazette';
+    if (reading && (action === 'close' || action === 'toggle')) leaveReading();
+    if (action !== 'close' && !reading) book.activate('close');
+    gazette.activate(action); readingControls(); invalidate();
+    status.textContent = gazette.opened ? 'The Wildfell Gazette is unfolded on the desk. Use its reading control to look closer, or the calendar to browse by date.' : 'The Wildfell Gazette is folded.';
+  }
+  gazetteButton.addEventListener('click', () => activateGazette('toggle'));
+  gazettePrevious.addEventListener('click', () => activateGazette('previous'));
+  gazetteNext.addEventListener('click', () => activateGazette('next'));
   function toggleDrawer(index) {
     if (!enabled) return;
     const drawer = desk.drawers[index]; drawer.open = !drawer.open;
@@ -157,8 +185,8 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
       activateBook(event.key === 'Escape' ? 'close' : event.key === 'ArrowRight' ? 'next' : 'previous');
     });
   });
-  bookClose.addEventListener('click', () => activateBook('close'));
-  bookRead.addEventListener('click', () => reading ? leaveReading() : enterReading());
+  bookClose.addEventListener('click', () => activePublication === 'gazette' ? activateGazette('close') : activateBook('close'));
+  bookRead.addEventListener('click', () => reading ? leaveReading() : enterReading(activePublication));
   zoomIn.addEventListener('click', () => setZoom(zoom * 1.25));
   zoomOut.addEventListener('click', () => setZoom(zoom / 1.25));
   viewReset.addEventListener('click', reset);
@@ -226,6 +254,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
           lastTap = { time: startedAt, x: event.clientX, y: event.clientY };
         }
       }
+      else if (target.startsWith('gazette:')) { if (!reading) activateGazette('toggle'); }
       else toggleDrawer(Number(target.slice(7)));
     }
     if (cancelled) clearTap();
@@ -240,6 +269,9 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
   canvas.addEventListener('pointerleave', () => room.classList.remove('is-drawer-hover'));
   canvas.addEventListener('keydown', event => {
     if (!enabled || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (activePublication === 'gazette' && gazette?.opened && ['Escape', 'Enter', ' ', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+      event.preventDefault(); activateGazette(event.key === 'ArrowLeft' ? 'previous' : event.key === 'ArrowRight' ? 'next' : 'close'); return;
+    }
     if (event.key === 'Escape' || ['Enter', ' '].includes(event.key) ||
       (book.motion.opened && ['ArrowLeft', 'ArrowRight'].includes(event.key))) {
       event.preventDefault();
@@ -261,6 +293,7 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
   return {
     get dragging() { return pointers.size > 0; },
     get reading() { return reading; },
+    get readingPublication() { return reading ? reader : null; },
     setEnabled(value) {
       enabled = value; bookControls.hidden = !value; readingControls();
       canvas.tabIndex = value ? 0 : -1;
@@ -275,14 +308,15 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
       if (reading) {
         const rect = size(), aspect = rect.width / rect.height;
         const usableHeight = Math.max(.55, 1 - 140 / rect.height);
-        const viewHeight = Math.max(book.depth / usableHeight, book.width / (aspect * .90));
+        const object = readingObject();
+        const viewHeight = Math.max(object.depth / usableHeight, object.width / (aspect * .90));
         camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
         camera.top = viewHeight / 2; camera.bottom = -camera.top; camera.zoom = zoom;
         direction.set(0, 1, 0);
-        const up = new THREE.Vector3(0, 0, -1).applyQuaternion(book.group.quaternion);
-        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(book.group.quaternion);
-        camera.up.copy(up); target.copy(book.group.position);
-        if (focusedBook !== null) {
+        const up = new THREE.Vector3(0, 0, -1).applyQuaternion(object.group.quaternion);
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(object.group.quaternion);
+        camera.up.copy(up); target.copy(object.group.position);
+        if (focusedBook !== null && reader === 'book') {
           const relative = book.anchor(focusedBook).sub(target), view = visible();
           if (Math.abs(relative.dot(right) - pan.x) > view.x * .40) pan.x = relative.dot(right);
           if (Math.abs(relative.dot(up) - pan.y) > view.y * .40) pan.y = relative.dot(up);
@@ -352,11 +386,33 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, status
       room.dataset.bookOpen = String(motion.opened);
       room.dataset.bookPage = String(motion.page); room.dataset.bookPhase = motion.phase;
       room.dataset.bookLeaves = String(motion.leafCount);
-      transcript.hidden = !motion.opened;
+      transcript.hidden = !motion.opened || (reading && reader !== 'book');
       bookControls.setAttribute('aria-busy', String(motion.busy));
-      bookClose.hidden = !motion.opened;
-      bookRead.hidden = !motion.opened;
-      viewToggle.hidden = motion.opened;
+      const newspaperActive = activePublication === 'gazette' && gazette?.opened;
+      const openPublication = newspaperActive || motion.opened;
+      bookClose.hidden = bookRead.hidden = !openPublication;
+      bookClose.setAttribute('aria-label', newspaperActive ? 'Fold Gazette' : 'Close book');
+      const current = newspaperActive ? 'gazette' : 'book';
+      if (toolbarPublication !== current) {
+        bookClose.innerHTML = newspaperActive ? newspaperIcon : bookCloseIcon;
+        bookRead.innerHTML = newspaperActive ? newspaperIcon.replace('</svg>', '<path d="M3 10V2h8m10 0h8v8M3 22v8h8m10 0h8v-8"/></svg>') : bookReadIcon;
+        toolbarPublication = current;
+      }
+      bookRead.setAttribute('aria-label', reading ? 'Return to desk' : newspaperActive ? 'Read Gazette full screen' : 'Read book full screen');
+      viewToggle.hidden = openPublication;
+      gazetteTools.hidden = gazette ? !newspaperActive : false;
+      if (gazette) {
+        room.dataset.gazetteOpen = String(gazette.opened); room.dataset.gazettePhase = gazette.phase;
+        room.dataset.gazettePage = String(gazette.page); room.dataset.gazetteDate = gazette.issue.date;
+        room.dataset.gazettePages = String(gazette.pageCount);
+        gazetteButton.setAttribute('aria-expanded', String(gazette.opened));
+        gazetteButton.setAttribute('aria-label', gazette.opened ? 'Fold Wildfell Gazette' : 'Unfold Wildfell Gazette');
+        gazettePrevious.disabled = gazette.page === 0; gazetteNext.disabled = gazette.page >= gazette.pageCount - 1;
+        document.querySelector('#gazette-transcript').hidden = !newspaperActive;
+        const point = gazette.anchor().project(camera);
+        gazetteButton.style.left = `${THREE.MathUtils.clamp((point.x + 1) * rect.width / 2, 26, rect.width - 26)}px`;
+        gazetteButton.style.top = `${THREE.MathUtils.clamp((1 - point.y) * rect.height / 2, 26, rect.height - 26)}px`;
+      }
       bookButtons.forEach(button => {
         const action = button.dataset.bookAction;
         button.hidden = action !== 'toggle' && !motion.opened;

@@ -13,20 +13,35 @@
     <main id="room" aria-label="An antique white wooden writing desk">
       <div id="desk-fallback" aria-hidden="true">
         <picture>
-          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=book-3" />
-          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=book-3" />
-          <img src="./materials/desk-still.webp?v=book-3" alt="" fetchpriority="high" />
+          <source media="(min-aspect-ratio: 3/2)" srcset="./materials/desk-still-wide.webp?v=gazette-1" />
+          <source media="(max-aspect-ratio: 3/4)" srcset="./materials/desk-still-portrait.webp?v=gazette-1" />
+          <img src="./materials/desk-still.webp?v=gazette-1" alt="" fetchpriority="high" />
         </picture>
       </div>
       <h1 class="sr-only">Wildfell Hall</h1>
-      <canvas id="desk" aria-describedby="desk-help" aria-label="An elevated view of an antique ivory writing desk, with a maroon leather-bound copy of The Tenant of Wildfell Hall, visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, a brass oval crest with embossed gold script, roses and leaves, and a light pink floral carpet"></canvas>
-      <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space. Click the maroon book to open it. Double-click or double-tap the book for a full-screen reading view, or use the Read book full screen button. Click the right page to turn forward, or the left page to turn back. With the book open, the left and right arrow keys turn pages. Escape returns from reading view to the same page on the desk; otherwise it closes the book. Tab also reaches the book and page controls.</p>
+      <canvas id="desk" aria-describedby="desk-help" aria-label="An elevated view of an antique ivory writing desk, with a loosely folded Wildfell Gazette and untied flax twine, a maroon leather-bound copy of The Tenant of Wildfell Hall, visible wood grain, carved drawers, porcelain and brass knobs, cabriole legs, a brass oval crest with embossed gold script, roses and leaves, and a light pink floral carpet"></canvas>
+      <p id="desk-help" class="sr-only">Scroll, pinch, or use the plus and minus keys to zoom. Drag or use the arrow keys to inspect the desk. Press Home or use Reset view to return to the starting view. Click or tap a drawer to open or close it, or Tab to its knob and press Enter or Space. Click the maroon book to open it. Double-click or double-tap the book for a full-screen reading view, or use the Read book full screen button. Click the right page to turn forward, or the left page to turn back. With the book open, the left and right arrow keys turn pages. Escape returns from reading view to the same page on the desk; otherwise it closes the book. Tab also reaches the book and page controls. Click the loosely folded newspaper to unfold the Wildfell Gazette on the desk. Its reading control opens a separate reading view. The calendar opens a date list; the Gazette arrows turn continuation sheets. Escape returns to the desk.</p>
       <article id="book-transcript" class="sr-only" aria-label="Current book pages" hidden></article>
       <div id="book-controls" role="group" aria-label="The Tenant of Wildfell Hall, ornamented aged pages" aria-controls="book-transcript" hidden>
         <button class="book-hotspot" data-book-action="toggle" aria-label="Open The Tenant of Wildfell Hall" aria-expanded="false"></button>
         <button class="book-hotspot" data-book-action="previous" aria-label="Previous page" hidden></button>
         <button class="book-hotspot" data-book-action="next" aria-label="Next page" hidden></button>
       </div>
+      <button id="gazette-hotspot" class="gazette-hotspot" aria-label="Unfold Wildfell Gazette" aria-expanded="false" hidden></button>
+      <article id="gazette-transcript" class="sr-only" aria-label="Current Gazette issue" hidden></article>
+      <div id="gazette-tools" role="group" aria-label="Gazette pages and archive" hidden>
+        <button id="gazette-previous" aria-label="Previous Gazette sheet" disabled><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" aria-hidden="true"><path d="M22 5 9 16l13 11M25 5 12 16l13 11M9 16h18"/></svg></button>
+        <button id="gazette-archive-open" aria-label="Browse Gazette by date" aria-haspopup="dialog"><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" aria-hidden="true"><path d="M6 7h20v21H6ZM6 12h20M10 4v6m12-6v6M9 16h3m3 0h3m3 0h3M9 20h3m3 0h3m3 0h3M9 24h3m3 0h3"/></svg></button>
+        <button id="gazette-next" aria-label="Next Gazette sheet" disabled><svg viewBox="0 0 32 32" fill="none" stroke="currentColor" aria-hidden="true"><path d="m10 5 13 11-13 11M7 5l13 11L7 27M5 16h18"/></svg></button>
+      </div>
+      <dialog id="gazette-archive" aria-labelledby="gazette-archive-title">
+        <button id="gazette-archive-close" aria-label="Close Gazette archive">×</button>
+        <p class="archive-kicker">Wildfell Gazette</p>
+        <h2 id="gazette-archive-title">The Archive</h2>
+        <ul id="gazette-dates"></ul>
+        <p id="gazette-archive-error" role="alert"></p>
+        <article id="gazette-fallback-text"></article>
+      </dialog>
       <div id="drawer-controls" role="group" aria-label="Desk drawers" hidden>
         <button class="drawer-hotspot" aria-label="Open left drawer" aria-expanded="false"></button>
         <button class="drawer-hotspot" aria-label="Open centre drawer" aria-expanded="false"></button>
@@ -94,7 +109,7 @@
           </button>
         </div>
       <p id="render-status" class="sr-only" role="status" aria-live="polite">Preparing the writing room.</p>
-      <noscript><p class="sr-only">A still version of the writing desk and leather-bound book. Enable JavaScript for lighting, zoom, opening drawers, and turning the book's pages. <a href="./book.txt">Read the book text</a>.</p></noscript>
+      <noscript><p class="sr-only">A still version of the writing desk and leather-bound book. Enable JavaScript for lighting, zoom, opening drawers, and turning the book's pages. <a href="./book.txt">Read the book text</a>. <a href="./gazette/issues/2026-10-29.txt">Read the first Gazette issue</a>.</p></noscript>
     </main>
     <script type="module" src="/src/main.js"></script>
   </body>

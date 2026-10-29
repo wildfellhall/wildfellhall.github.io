@@ -1,0 +1,30 @@
+WILDFELL GAZETTE — DESIGN REFERENCES
+
+The Illustrated London News, first issue, 14 May 1842.
+Library of Congress, Prints & Photographs, item 95514551.
+https://www.loc.gov/item/95514551/
+Reference scan viewed:
+https://tile.loc.gov/storage-services/service/pnp/cph/3c10000/3c15000/3c15100/3c15113v.jpg
+Studied: decorated masthead, engraved architectural vignette, horizontal
+date rules, narrow columns, small serif headlines, and wood-engraving hatching.
+
+The Leader, 4 January 1851, page 1.
+Nineteenth-Century Serials Edition (ncse), a scholarly digital edition
+in collaboration with the British Library, Birkbeck and King's College London.
+https://ncse.ac.uk/periodicals/l/issues/cld_04011851/page/1/
+Reference scan viewed:
+https://ncse.ac.uk/static/media/periodicals/101-CLD-1851-01-04-001-SINGLE/Pg001_W3pt8Xy.png
+Studied: blackletter masthead with flourishes, dated issue line, compact
+article headings, three-column composition and uneven letterpress impressions.
+
+The Gazette blends these visual traditions; it is not a facsimile of either
+publication. Publication dates are real contemporary dates. Its house and
+botanical vignette are original code-drawn linework; reference scans are not
+redistributed as website assets. Paper, ink wear, folds and twine are procedural.
+Empty editorial sections contain no invented articles or imitation body text.
+
+Typefaces (modern revivals, locally bundled):
+UnifrakturMaguntia — ornamental blackletter masthead.
+Libre Baskerville — newspaper body and headlines.
+TT2020 Style E — the book's varied typewriter impressions.
+Their SIL Open Font License files are included in /ornaments/.

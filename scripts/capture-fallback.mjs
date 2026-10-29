@@ -22,7 +22,7 @@ try {
   for (const [name, width, height, deviceScaleFactor] of [['desk-still', 1440, 1000, 1], ['desk-still-portrait', 630, 840, 2], ['desk-still-wide', 2560, 1080, 1]]) {
     const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor, reducedMotion: 'reduce' });
     await page.goto(url);
-    await page.locator('#room.is-ready').waitFor({ timeout: 60000 });
+    await page.locator('#room.is-ready').waitFor({ timeout: 90000 });
     // Let the first rendered frame replace the previous still before capture.
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     // Element screenshots include overlapping siblings. Keep controls and the

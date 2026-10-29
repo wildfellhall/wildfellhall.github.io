@@ -84,7 +84,7 @@ test('resting leaves match the curved stack exactly and cut edges do not tilt th
     const lp = leaf.attributes.position, sp = stack.attributes.position, sn = stack.attributes.normal;
     for (let i = 0; i < lp.count; i++) {
       assert.ok(new THREE.Vector3().fromBufferAttribute(lp, i).distanceTo(new THREE.Vector3().fromBufferAttribute(sp, i)) < 1e-6);
-      assert.ok(sn.getY(i) > .65 && Math.abs(sn.getZ(i)) < 1e-5, 'The top has paper normals, including its cut edge');
+      assert.ok(sn.getY(i) > .65 && Math.abs(sn.getZ(i)) < .10, 'The top has paper normals, including its cut edge');
     }
     const profile = paperProfile(count, bow);
     assert.ok(profile[0].y <= profile.at(-1).y);

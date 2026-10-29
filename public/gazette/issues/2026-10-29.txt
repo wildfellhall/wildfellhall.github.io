@@ -1,0 +1,30 @@
+# Wildfell Gazette — 29 October 2026
+# Keep these section identifiers. Put prose below the blank line after byline.
+# Empty sections intentionally show only their headings on the newspaper.
+date: 2026-10-29
+number: 1
+
+[article-1]
+title:
+byline:
+
+[article-2]
+title:
+byline:
+
+[article-3]
+title:
+byline:
+
+[thought-a-day]
+title:
+byline:
+
+[words-of-the-week]
+title:
+byline:
+
+[miscellaneous]
+title:
+byline:
+

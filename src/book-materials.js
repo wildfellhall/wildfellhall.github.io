@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createPaperStock } from './paper-stock.js';
 
 // Material references (photographs studied, not used as textures):
 // https://www.blackheathbooks.com.au/product-page/glossary-of-ecclesiastical-ornament-and-costume-pugin-1844
@@ -70,46 +71,16 @@ export function createBookMaterials() {
   for (const map of [leather.map, leather.bumpMap, leather.normalMap, leather.roughnessMap]) map.wrapS = map.wrapT = THREE.RepeatWrapping;
   const gold = new THREE.MeshStandardMaterial({ color: '#e7c478', metalness: .90, roughness: .34, envMapIntensity: 1.4,
     bumpMap: leather.bumpMap, bumpScale: .00025 });
-  const paper = [0, 1, 2].map(seed => paperMaterial(seed));
+  const paper = [0, 1, 2].map(seed => createPaperStock(seed));
   const edgeSize = 512, edgePixels = new Uint8Array(edgeSize * edgeSize * 4), edgeHeights = new Uint8Array(edgePixels.length);
   for (let y = 0; y < edgeSize; y++) for (let x = 0; x < edgeSize; x++) {
     const layers = y / edgeSize * 48, distance = Math.abs(layers - Math.round(layers));
     const line = Math.exp(-((distance / .13) ** 2));
     const fibre = softNoise(x / 8, y / 3) * 3, age = softNoise(x / 77, y / 71) * 5;
     const shade = fibre + age - line * 8, i = (y * edgeSize + x) * 4;
-    edgePixels.set([226 + shade, 215 + shade, 192 + shade, 255], i);
+    edgePixels.set([235 + shade, 228 + shade, 208 + shade, 255], i);
     const height = 145 - line * 24 + fibre; edgeHeights.set([height, height, height, 255], i);
   }
   const edges = new THREE.MeshStandardMaterial({ map: texture(edgePixels, edgeSize, true), bumpMap: texture(edgeHeights, edgeSize), bumpScale: .00045, roughness: .97 });
   return { leather, gold, paper, edges };
-}
-
-function paperMaterial(seed) {
-  const size = 768, rng = random(1870 + seed * 173), pixels = new Uint8Array(size * size * 4), heights = new Uint8Array(pixels.length);
-  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
-    const edge = Math.min(x, y, size - 1 - x, size - 1 - y) / size;
-    const age = Math.exp(-edge * 35) * 15, grain = (rng() - .5) * 3;
-    const cloud = softNoise(x / 80 + seed * 19, y / 100) * 9 + softNoise(x / 27, y / 31 + seed * 23) * 3;
-    const i = (y * size + x) * 4;
-    pixels.set([235 - age * .7 + grain + cloud, 225 - age + grain + cloud, 201 - age * 1.4 + grain + cloud, 255], i);
-    const h = 126 + grain * 2 + softNoise(x / 3, y / 21) * 12; heights.set([h, h, h, 255], i);
-  }
-  // Sparse, diffuse foxing stays near the margins. The writing area is blank.
-  for (let spot = 0; spot < 95; spot++) {
-    let x = rng() * size, y = rng() * size;
-    if (spot < 75) {
-      if (spot % 2) x = rng() < .5 ? rng() * 75 : size - rng() * 75;
-      else y = rng() < .5 ? rng() * 75 : size - rng() * 75;
-    }
-    const radius = 1 + rng() * 5;
-    for (let yy = Math.max(0, Math.floor(y - radius * 3)); yy < Math.min(size, y + radius * 3); yy++) {
-      for (let xx = Math.max(0, Math.floor(x - radius * 3)); xx < Math.min(size, x + radius * 3); xx++) {
-        const amount = Math.exp(-((xx - x) ** 2 + (yy - y) ** 2) / radius ** 2) * (spot < 75 ? 22 : 11);
-        const i = (yy * size + xx) * 4;
-        pixels[i] -= amount * .55; pixels[i + 1] -= amount; pixels[i + 2] -= amount * 1.1;
-      }
-    }
-  }
-  return new THREE.MeshStandardMaterial({ map: texture(pixels, size, true), bumpMap: texture(heights, size),
-    bumpScale: .00035, roughness: .96, side: THREE.DoubleSide });
 }

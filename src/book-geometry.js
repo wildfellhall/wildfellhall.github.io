@@ -4,6 +4,7 @@ import { LEAF_COUNT } from './book-motion.js';
 export const PAGE_WIDTH = 2.40, PAGE_DEPTH = 3.34, SHEET_STEP = .005, PAGE_BASE = .0825;
 const COLUMNS = 64, ROWS = 24;
 export const pageLift = s => .025 * Math.sin(s * Math.PI) + .006 * (1 - Math.exp(-s * 12));
+const pageCockle = (s, v, bow) => bow * Math.sin(s * Math.PI / 2) * (.009 * Math.sin(v * Math.PI * 3.5 + s * 4) + .004 * Math.sin(v * 17 - s * 9));
 export const sewnHeight = (count, bow = 1) => PAGE_BASE + count * SHEET_STEP * (1 - .56 * bow);
 
 // Integrate fixed-length paper sections so the free leaf and the stack share
@@ -57,7 +58,7 @@ export function bendLeaf(geometry, progress, rootHeight, bow = 1, thickness = 0)
           + Math.cos(progress * Math.PI) * (1 - swing) * restAngle;
         x += Math.cos(angle) * step; y += Math.sin(angle) * step;
       }
-      p.setXYZ(i * (ROWS + 1) + j, x, y, z + swing * .018 * Math.sin(s * Math.PI));
+      p.setXYZ(i * (ROWS + 1) + j, x, y + pageCockle(s, j / ROWS, bow), z + swing * .018 * Math.sin(s * Math.PI));
     }
   }
   p.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingSphere();
@@ -101,7 +102,7 @@ export function sizePageBlock(geometry, count, bow = 1) {
   geometry.userData.surfaces.forEach((vertex, i) => {
     const cross = profile[Math.round(vertex.s * COLUMNS)];
     const base = PAGE_BASE + pageLift(vertex.s) * bow;
-    p.setXYZ(i, cross.x, THREE.MathUtils.lerp(base, cross.y, vertex.top), (vertex.v - .5) * PAGE_DEPTH);
+    p.setXYZ(i, cross.x, THREE.MathUtils.lerp(base, cross.y, vertex.top) + pageCockle(vertex.s, vertex.v, bow), (vertex.v - .5) * PAGE_DEPTH);
     if (vertex.face !== 'top') uv.setY(i, vertex.top * count / LEAF_COUNT);
   });
   p.needsUpdate = uv.needsUpdate = true; geometry.computeVertexNormals(); geometry.computeBoundingSphere();

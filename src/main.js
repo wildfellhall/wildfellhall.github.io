@@ -8,6 +8,7 @@ import { createCarpet } from './ornaments.js';
 import { createDeskInteraction } from './desk-interaction.js';
 import { createControlFrame } from './control-frame.js';
 import { createBook } from './book.js';
+import { createGazette, connectArchive } from './gazette.js';
 import { applyWoodCoordinates } from './wood-finish.js';
 import { parseBookText } from './book-text.js';
 
@@ -85,7 +86,7 @@ async function init() {
   fill.position.set(9, 3, 7); scene.add(fill);
   const rim = new THREE.DirectionalLight('#fff3e3', .45);
   rim.position.set(-2, 6, -8); scene.add(rim);
-  const [desk, carpet, book] = await Promise.all([createDesk(renderer), createCarpet(renderer), bookText.then(text => createBook(DESK.surfaceY, text, renderer.capabilities.maxTextureSize))]);
+  const [desk, carpet, book, gazette] = await Promise.all([createDesk(renderer), createCarpet(renderer), bookText.then(text => createBook(DESK.surfaceY, text, renderer.capabilities.maxTextureSize)), createGazette(DESK.surfaceY, renderer.capabilities.maxTextureSize).catch(error => { console.warn('Gazette unavailable:', error); return null; })]);
   const controlFrame = await createControlFrame(document.querySelector('.desk-controls')).catch(error => {
     console.warn('Using the still metal frame:', error);
     return null;
@@ -99,6 +100,7 @@ async function init() {
   applyWoodCoordinates(readingGround);
   readingGround.receiveShadow = true; readingGround.visible = false;
   scene.add(furniture, book.group, readingGround);
+  if (gazette) scene.add(gazette.group);
   renderer.shadowMap.needsUpdate = true;
 
   // Small-scale occlusion makes the carved undercuts read without painting black outlines.
@@ -115,7 +117,7 @@ async function init() {
   let graphicsAvailable = true;
   let currentLight = 0, currentDetail = 0, wasReading = false;
   const pointer = new THREE.Vector2(), currentPointer = new THREE.Vector2();
-  const interaction = createDeskInteraction({ canvas, room, camera, desk, book, status, invalidate, resetView: () => {
+  const interaction = createDeskInteraction({ canvas, room, camera, desk, book, gazette, status, invalidate, resetView: () => {
     setDetail(false); pointer.set(0, 0); currentPointer.set(0, 0);
   } });
   const afternoon = new THREE.Color('#fff0d6'), dusk = new THREE.Color('#ffcb94');
@@ -142,12 +144,19 @@ async function init() {
     hemisphere.color.copy(sky).lerp(duskSky, currentLight);
     hemisphere.intensity = .42 - currentLight * .10;
     renderer.toneMappingExposure = .94 - currentLight * .06;
+    // Place the publications from this frame's settled state, including when
+    // reduced motion completes an opening in a single frame.
+    const drawers = interaction.animateDrawers(delta, motionQuery.matches);
+    const pages = book.animate(delta, motionQuery.matches);
+    const newspaper = gazette?.animate(delta, motionQuery.matches);
     // A narrow carpet surround on desktop; portrait crops the sides instead
     // of shrinking the writing surface into the middle of a large floor.
     const aspect = width / height, viewHeight = Math.min(12.2, Math.max(11.6, 17.6 / aspect));
     camera.left = -viewHeight * aspect / 2; camera.right = -camera.left;
     camera.top = viewHeight / 2; camera.bottom = -camera.top;
-    if (!interaction.reading) book.place(viewHeight * aspect, aspect <= .75);
+    if (!interaction.reading) { book.place(viewHeight * aspect, aspect <= .75); gazette?.place(viewHeight * aspect, aspect <= .75); }
+    book.group.visible = interaction.readingPublication !== 'gazette';
+    if (gazette) { gazette.group.visible = interaction.readingPublication !== 'book'; gazette.twine.visible = !interaction.reading; }
     furniture.visible = !interaction.reading; readingGround.visible = interaction.reading;
     if (wasReading !== interaction.reading) { renderer.shadowMap.needsUpdate = true; wasReading = interaction.reading; }
     const target = baseTarget.clone();
@@ -158,14 +167,12 @@ async function init() {
     interaction.applyCamera(target, direction, currentDetail);
     camera.position.copy(target).addScaledVector(direction, 28);
     camera.lookAt(target); camera.updateProjectionMatrix(); camera.updateMatrixWorld();
-    const drawers = interaction.animateDrawers(delta, motionQuery.matches);
-    const pages = book.animate(delta, motionQuery.matches);
-    if (drawers.changed || pages.changed) renderer.shadowMap.needsUpdate = true;
+    if (drawers.changed || pages.changed || newspaper?.changed) renderer.shadowMap.needsUpdate = true;
     composer.render();
     controlFrame?.render(currentLight);
     interaction.projectButtons();
     const unsettled = Math.abs(currentLight - desiredLight) > .0005 || Math.abs(currentDetail - desiredDetail) > .0005 || currentPointer.distanceToSquared(pointer) > .00001;
-    if (unsettled || drawers.unsettled || pages.unsettled) invalidate();
+    if (unsettled || drawers.unsettled || pages.unsettled || newspaper?.unsettled) invalidate();
   }
   room.addEventListener('pointermove', event => {
     if (interaction.reading || interaction.dragging || motionQuery.matches || !finePointer.matches || event.pointerType === 'touch') return;
@@ -205,6 +212,7 @@ async function init() {
 init().then(result => { engine = result; }).catch(error => {
   console.error('The 3D desk could not be loaded:', error);
   room.classList.add('is-fallback');
+  connectArchive({ status, fallback: true });
   status.textContent = 'Showing a still version of the writing desk.';
   lightButton.disabled = viewButton.disabled = true;
   document.querySelector('.desk-controls').hidden = true;

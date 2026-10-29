@@ -41,7 +41,7 @@ export async function createBookPages(paper, source, maxTextureSize = 4096) {
       ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height); ctx.restore();
       ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height);
       material.bumpMap = new THREE.CanvasTexture(createImpressedPaper(paperHeights[seed], ink, mirrored));
-      material.userData.printedBump = true;
+      material.normalMap = null; material.userData.printedBump = true;
     }
     material.map = new THREE.CanvasTexture(canvas); material.map.colorSpace = THREE.SRGBColorSpace;
     material.map.anisotropy = 8; material.name = `printed-page-${index + 1}`;

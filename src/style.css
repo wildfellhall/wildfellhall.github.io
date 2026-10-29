@@ -13,8 +13,8 @@ button:focus-visible { outline: 2px solid #947039; outline-offset: 5px; border-r
 .is-ready.is-drawer-hover #desk { cursor: pointer; }
 .is-ready.is-dragging #desk { cursor: grabbing; }
 #desk:focus-visible { outline: 2px solid #947039; outline-offset: -4px; }
-.drawer-hotspot, .book-hotspot { position: absolute; z-index: 2; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 0; padding: 0; background: transparent; pointer-events: none; }
-.drawer-hotspot:focus-visible, .book-hotspot:focus-visible { outline: 2px solid #947039; outline-offset: 4px; border-radius: 50%; background: #fff8e822; }
+.drawer-hotspot, .book-hotspot, .gazette-hotspot { position: absolute; z-index: 2; width: 44px; height: 44px; transform: translate(-50%, -50%); border: 0; padding: 0; background: transparent; pointer-events: none; }
+.drawer-hotspot:focus-visible, .book-hotspot:focus-visible, .gazette-hotspot:focus-visible { outline: 2px solid #947039; outline-offset: 4px; border-radius: 50%; background: #fff8e822; }
 .room-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 47% 42%, transparent 40%, #302d2312 100%); z-index: 1; }
 .desk-controls { position: absolute; z-index: 3; right: max(20px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 2px; width: min(308px, calc(100% - 28px)); height: 86px; padding: 22px 22px 20px; color: #694820; isolation: isolate; filter: drop-shadow(0 3px 2px #3f291f36) drop-shadow(0 7px 9px #3f291f18); }
 .desk-controls::before { content: ''; position: absolute; z-index: -1; inset: 0; background: url('/materials/control-frame-day.webp?v=cast-2') center / 100% 100% no-repeat; pointer-events: none; }
@@ -41,3 +41,22 @@ button:focus-visible { outline: 2px solid #947039; outline-offset: 5px; border-r
   .desk-controls { right: max(14px, env(safe-area-inset-right)); bottom: max(12px, env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }
+
+#gazette-tools { position: absolute; bottom: max(23px, env(safe-area-inset-bottom)); left: max(24px, env(safe-area-inset-left)); display: flex; gap: 4px; z-index: 3; padding: 3px 7px; color: #4e493a; background: #e8e0cb; border: 1px solid #ab9a7c; box-shadow: inset 0 0 0 3px #f4eedc, inset 0 0 0 4px #b7a78a, 0 3px 8px #40352230; transform: rotate(-1deg); }
+#gazette-tools button { width: 44px; height: 44px; padding: 10px; background: none; border: 0; cursor: pointer; }
+#gazette-tools button:disabled { opacity: .3; cursor: default; }
+#gazette-tools button:hover:not(:disabled) { background: #9c81541a; }
+#gazette-tools svg { width: 24px; height: 24px; stroke-width: 1.15; stroke-linejoin: round; stroke-linecap: round; }
+#gazette-archive { width: min(490px, calc(100% - 36px)); max-height: calc(100dvh - 64px); overflow-y: auto; padding: 42px 36px 30px; border: 1px solid #a49372; color: #3d382f; background-color: #ece6d7; background-image: url('/materials/archive-paper.webp'); background-size: 512px; box-shadow: 0 18px 80px #271c1555, inset 0 0 0 6px #e8deca, inset 0 0 0 7px #b3a385; }
+#gazette-archive::backdrop { background: #241d1354; backdrop-filter: blur(3px); }
+#gazette-archive-close { position: absolute; top: 9px; right: 10px; width: 44px; height: 44px; border: 0; background: transparent; font-size: 28px; cursor: pointer; }
+.archive-kicker { text-align: center; font-variant: small-caps; letter-spacing: .08em; margin: 0; }
+#gazette-archive h2 { text-align: center; font-size: 28px; font-weight: 400; margin: 12px 0 24px; padding-bottom: 16px; border-bottom: 3px double #81745b; }
+#gazette-dates { list-style: none; margin: 0; padding: 0; }
+#gazette-dates button { width: 100%; min-height: 48px; padding: 12px; text-align: left; border: 0; border-bottom: 1px solid #a99a7d70; background: transparent; cursor: pointer; }
+#gazette-dates button:hover, #gazette-dates button[aria-current] { background: #baa58029; }
+#gazette-dates button[aria-current] { border-left: 2px solid #8f7955; }
+#gazette-archive-error { line-height: 1.5; }
+#gazette-fallback-text { line-height: 1.75; white-space: pre-line; overflow-wrap: anywhere; }
+#gazette-fallback-text h3 { margin-top: 2em; font-size: 19px; }
+@media (max-width: 670px) { #gazette-tools { bottom: max(107px, calc(env(safe-area-inset-bottom) + 93px)); left: 22px; } }

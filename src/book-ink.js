@@ -26,12 +26,15 @@ export function createInkLayer(page, index, scale, paperHeight) {
   canvas.width = Math.round(TYPE.width * scale); canvas.height = Math.round(TYPE.height * scale);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.scale(scale, scale); ctx.font = TYPEWRITER_FONT; ctx.fontKerning = 'none';
-  ctx.fillStyle = '#17191b'; ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = '#111216'; ctx.textBaseline = 'alphabetic';
   const pitch = ctx.measureText('M').width;
   for (const line of page.lines) {
     // Whole runs preserve TT2020's nine contextual variants. Drawing one
     // character at a time would silently discard its alternate impressions.
-    ctx.fillText(line.text, line.x, line.y);
+    ctx.save();
+    ctx.translate(line.x + (noise(0, line.y, index) - .5) * .65, line.y + (noise(1, line.y, index) - .5) * .8);
+    ctx.rotate((noise(2, line.y, index) - .5) * .0008);
+    ctx.fillText(line.text, 0, 0); ctx.restore();
   }
   const ink = ctx.getImageData(0, 0, canvas.width, canvas.height), p = ink.data;
   const top = Math.max(0, Math.floor((TYPE.top - 10) * scale));
@@ -43,15 +46,15 @@ export function createInkLayer(page, index, scale, paperHeight) {
     const u = x / scale, v = y / scale;
     const column = Math.floor((u - TYPE.left) / pitch);
     const row = Math.floor((v - TYPE.top - TYPE.fontSize * .15) / TYPE.lineHeight);
-    const pressure = .78 + noise(column, row, index + 41) * .20;
+    const pressure = .91 + noise(column, row, index + 41) * .09;
     const fibres = data[(Math.min(height - 1, Math.floor(v / TYPE.height * height)) * width
       + Math.min(width - 1, Math.floor(u / TYPE.width * width))) * 4];
     const grain = noise(x, y, index + 17);
     const patch = noise(Math.floor(u * 1.8), Math.floor(v * 2.1), index + 83);
     // Partial ribbon contact leaves pale fibres and tiny voids *inside* ink,
     // rather than stamping the same clean outline with a lower opacity.
-    const contact = patch < .075 ? .24 + grain * .32 : .81 + grain * .19;
-    const fibreContact = Math.max(.65, Math.min(1.08, 1 + (fibres - 128) * .012));
+    const contact = patch < .045 ? .22 + grain * .30 : .94 + grain * .06;
+    const fibreContact = Math.max(.72, Math.min(1.04, 1 + (fibres - 128) * .007));
     p[i + 3] *= pressure * contact * fibreContact;
   }
   ctx.putImageData(ink, 0, 0);
@@ -68,7 +71,7 @@ export function createImpressedPaper(base, ink, mirrored) {
   ctx.clearRect(0, 0, TYPE.width, TYPE.height); ctx.drawImage(base, 0, 0, TYPE.width, TYPE.height);
   const height = ctx.getImageData(0, 0, TYPE.width, TYPE.height);
   for (let i = 0; i < height.data.length; i += 4) {
-    const value = height.data[i] - coverage[i + 3] / 255 * 5;
+    const value = height.data[i] - coverage[i + 3] / 255 * 14;
     height.data[i] = height.data[i + 1] = height.data[i + 2] = value;
   }
   ctx.putImageData(height, 0, 0);
