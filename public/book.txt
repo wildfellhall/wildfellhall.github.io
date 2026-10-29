@@ -7,3 +7,5 @@
 # To update the website, commit this file and push to main on GitHub.
 # These instructions can stay here. Until you add text, the pages stay blank.
 Hi! My name is Sanah Rajesh (Wildfell Hall on Github and Hugging Face) and I'm a teenage developer, designer, and general hobbyist interested in AI, machine learning, mechanistic interpretability, language/linguistics, writing, reading, philosophy, and enhancing literary education and literacy. 
+
+I named myself Wildfell Hall after my favorite Bronte novel, and one of my favorite books of all time, The Tenant of Wildfell Hall, written by Anne Bronte under the pseudonym Acton Bell and censored following her death due to its defying the conventions of the time period. In several of my ongoing projects, including my fine-tuned models and my models from scratch, I'm aiming to analyze these conventions as they appear, and are defied, in female works written from the 18th to 19th centuries. 
