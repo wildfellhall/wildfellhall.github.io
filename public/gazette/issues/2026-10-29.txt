@@ -6,25 +6,25 @@ number: 1
 
 [article-1]
 title:
-byline:
+byline: Sanah Rajesh
 
 [article-2]
 title:
-byline:
+byline: Sanah Rajesh
 
 [article-3]
 title:
-byline:
+byline: Sanah Rajesh
 
 [thought-a-day]
 title:
-byline:
+byline: Sanah Rajesh
 
 [words-of-the-week]
 title:
-byline:
+byline: Sanah Rajesh
 
 [miscellaneous]
 title:
-byline:
+byline: Sanah Rajesh
 
