@@ -466,6 +466,10 @@ test('Gazette unfolds on the desk, reads separately, and switches dated issues w
   await page.locator('#room[data-gazette-page="0"]').waitFor();
   assert.equal(await page.getByRole('button', {name: 'Previous Gazette sheet'}).isDisabled(), true);
   await page.screenshot({path: 'test-results/gazette-front-page-desktop.png'});
+  await page.keyboard.press('Escape');
+  await page.locator('#room[data-gazette-reading="false"]').waitFor();
+  await page.getByRole('button', {name: 'Read Gazette full screen', exact: true}).click();
+  await page.locator('#room[data-gazette-reading="true"][data-gazette-page="0"]').waitFor();
   for (let number = 1; number < 4; number++) {
     await page.getByRole('button', {name: 'Next Gazette sheet'}).click();
     await page.locator(`#room[data-gazette-page="${number}"]`).waitFor();

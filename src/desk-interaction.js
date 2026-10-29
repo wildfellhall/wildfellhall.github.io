@@ -113,7 +113,9 @@ export function createDeskInteraction({ canvas, room, camera, desk, book, gazett
     else if (ownedFullscreen) { ownedFullscreen = false; leaveReading(); }
     invalidate();
   });
-  room.addEventListener('keydown', event => {
+  // Reaching the first/last page disables the focused navigation button;
+  // browsers can move focus to the body. Escape must still leave the reader.
+  document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && reading && !document.querySelector('#gazette-archive').open) {
       event.preventDefault(); event.stopPropagation(); leaveReading();
     }
