@@ -33,6 +33,15 @@ Shallow compression and an ink-dependent roughness map couple the same
 impression to the paper surface. Reduced surface sheen keeps the dark ink
 visible under the existing room lighting. The font file is not modified.
 
+Paper is a procedural interpretation of gently aged book stock: short,
+embedded rag fibres, fine surface tooth, softly varying pulp formation,
+faint mould traces and restrained oxidation at the exposed cut edges.
+Colour, height and roughness describe the same sheet; all printed leaves,
+blank leaves and endpapers use a matte finish. The height/roughness maps
+follow the colour map's orientation on both sides of a turning leaf.
+The 1848 scan informs the scale and restraint of the wear, not a sampled
+paper colour or a claim to reconstruct its exact paper furnish.
+
 Paragraph composition shares tex-linebreak and the British hyphenation
 patterns documented in /gazette/references.txt. Discretionary hyphens are
 rendering only; the editable book.txt and accessible text keep the author's

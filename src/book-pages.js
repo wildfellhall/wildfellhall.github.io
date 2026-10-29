@@ -34,14 +34,13 @@ export async function createBookPages(paper, source, maxTextureSize = 4096) {
     ctx.drawImage(backgrounds[seed], 0, 0, TYPE.width, TYPE.height);
     drawPageOrnaments(ctx, TYPE.width, TYPE.height);
     const material = paper[seed].clone();
-    if (printed) {
-      const ink = createInkLayer(pages[index], index, scale, paper[seed].bumpMap.image);
-      ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height);
-      material.bumpMap = new THREE.CanvasTexture(createImpressedPaper(paperHeights[seed], ink, mirrored));
-      material.roughnessMap = new THREE.CanvasTexture(createImpressedPaper(paperRoughness[seed], ink, mirrored, 14));
-      material.bumpScale = .0022; material.specularIntensity = .035; material.sheen = 0;
-      material.normalMap = null; material.userData.printedBump = true;
-    }
+    const ink = printed ? createInkLayer(pages[index], index, scale, paper[seed].bumpMap.image) : null;
+    if (ink) ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height);
+    // Every leaf shares the same matte stock. These maps follow the colour
+    // texture's orientation, including blank versos and pastedown endpapers.
+    material.bumpMap = new THREE.CanvasTexture(createImpressedPaper(paperHeights[seed], ink, mirrored));
+    material.roughnessMap = new THREE.CanvasTexture(createImpressedPaper(paperRoughness[seed], ink, mirrored, 14));
+    material.bumpMap.anisotropy = material.roughnessMap.anisotropy = 8;
     material.map = new THREE.CanvasTexture(canvas); material.map.colorSpace = THREE.SRGBColorSpace;
     material.map.anisotropy = 8; material.name = `printed-page-${index + 1}`;
     cache.set(index, material); return material;
@@ -54,7 +53,7 @@ export async function createBookPages(paper, source, maxTextureSize = 4096) {
         if (cache.size <= 6) break;
         if (active.has(index)) continue;
         material.map.dispose();
-        if (material.userData.printedBump) { material.bumpMap.dispose(); material.roughnessMap.dispose(); }
+        material.bumpMap.dispose(); material.roughnessMap.dispose();
         material.dispose(); cache.delete(index);
       }
     },

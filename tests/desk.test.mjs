@@ -595,7 +595,10 @@ test('turning printed leaves retain the ink-compressed paper surface on both fac
     const printed = [front, back].every(face => face.material.normalMap === null && face.material.bumpMap.isCanvasTexture
       && face.material.roughnessMap.isCanvasTexture && face.material.map.isCanvasTexture);
     book.animate(0, true); book.activate('next'); book.animate(.15, false);
-    const blank = [front, back].every(face => Boolean(face.material.normalMap));
+    const stock = book.group.getObjectByName('folded-endpaper-hinge').material;
+    const blank = [front, back].every(face => face.material.normalMap === null && face.material.bumpMap.isCanvasTexture
+      && face.material.roughnessMap.isCanvasTexture && face.material.sheen === stock.sheen
+      && face.material.bumpScale === stock.bumpScale && face.material.specularIntensity === stock.specularIntensity);
     return { printed, blank };
   });
   assert.deepEqual(proof, {printed: true, blank: true}); await page.close();

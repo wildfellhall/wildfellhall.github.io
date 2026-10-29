@@ -115,8 +115,8 @@ export async function createBook(surfaceY, source = '', maxTextureSize = 4096) {
       bendLeaf(turning.geometry, p, sewnHeight(count) + .0007, 1, count * SHEET_STEP);
       for (const [target, index] of [[recto, faces.front], [verso, faces.back]]) {
         const printed = printing.get(index);
-        // Printed stock uses its ink-compressed height field. Retaining the
-        // blank stock's normal map would override that field during a turn.
+        // Carry the complete paper surface through the turn so its fine
+        // grain, matte finish and ink impression stay on both moving faces.
         if (Boolean(target.normalMap) !== Boolean(printed.normalMap)) target.needsUpdate = true;
         target.map = printed.map; target.bumpMap = printed.bumpMap; target.normalMap = printed.normalMap;
         target.roughnessMap = printed.roughnessMap; target.bumpScale = printed.bumpScale;

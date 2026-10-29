@@ -35,15 +35,21 @@ export function createImpressedPaper(base, ink, mirrored, impression = 6) {
   // remain absorbed ink, with no raised bevel or artificial drop shadow.
   const canvas = document.createElement('canvas'); canvas.width = TYPE.width; canvas.height = TYPE.height;
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
-  ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height);
-  const coverage = ctx.getImageData(0, 0, TYPE.width, TYPE.height).data;
-  ctx.clearRect(0, 0, TYPE.width, TYPE.height); ctx.drawImage(base, 0, 0, TYPE.width, TYPE.height);
-  const height = ctx.getImageData(0, 0, TYPE.width, TYPE.height);
-  for (let i = 0; i < height.data.length; i += 4) {
-    const value = height.data[i] - coverage[i + 3] / 255 * impression;
-    height.data[i] = height.data[i + 1] = height.data[i + 2] = value;
+  let coverage;
+  if (ink) {
+    ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height);
+    coverage = ctx.getImageData(0, 0, TYPE.width, TYPE.height).data;
+    ctx.clearRect(0, 0, TYPE.width, TYPE.height);
   }
-  ctx.putImageData(height, 0, 0);
+  ctx.drawImage(base, 0, 0, TYPE.width, TYPE.height);
+  if (coverage) {
+    const height = ctx.getImageData(0, 0, TYPE.width, TYPE.height);
+    for (let i = 0; i < height.data.length; i += 4) {
+      const value = height.data[i] - coverage[i + 3] / 255 * impression;
+      height.data[i] = height.data[i + 1] = height.data[i + 2] = value;
+    }
+    ctx.putImageData(height, 0, 0);
+  }
   if (mirrored) {
     ctx.globalCompositeOperation = 'copy'; ctx.setTransform(-1, 0, 0, 1, TYPE.width, 0);
     ctx.drawImage(canvas, 0, 0);
