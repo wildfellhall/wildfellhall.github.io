@@ -39,7 +39,7 @@ export async function createBookPages(paper, source, maxTextureSize = 4096) {
       ctx.drawImage(ink, 0, 0, TYPE.width, TYPE.height);
       material.bumpMap = new THREE.CanvasTexture(createImpressedPaper(paperHeights[seed], ink, mirrored));
       material.roughnessMap = new THREE.CanvasTexture(createImpressedPaper(paperRoughness[seed], ink, mirrored, 14));
-      material.bumpScale = .0022; material.specularIntensity = .065; material.sheen = .025;
+      material.bumpScale = .0022; material.specularIntensity = .035; material.sheen = 0;
       material.normalMap = null; material.userData.printedBump = true;
     }
     material.map = new THREE.CanvasTexture(canvas); material.map.colorSpace = THREE.SRGBColorSpace;

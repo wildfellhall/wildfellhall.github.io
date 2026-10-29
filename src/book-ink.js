@@ -1,11 +1,11 @@
-import romanUrl from './assets/fonts/OldStandard-Regular.ttf?url';
+import romanUrl from './assets/fonts/IMFeENrm28P.ttf?url';
 import { TYPE } from './book-text.js';
 import { distressPressInk } from './press-ink.js';
 
-// Old Standard TT, Alexey Kryukov / Old Standard Project, SIL OFL 1.1.
-// A freely licensed Modern-style Roman; source and scan notes are in
+// IM FELL English, Igino Marini, SIL OFL 1.1.
+// The revival retains irregular cut serifs and uneven strokes; scan notes are in
 // public/book-references.txt. The upstream font itself is unmodified.
-export const BOOK_FAMILY = 'Wildfell Book Roman';
+export const BOOK_FAMILY = 'Wildfell Book Fell';
 export const BOOK_FONT = `${TYPE.fontSize}px "${BOOK_FAMILY}", Georgia, serif`;
 let fontReady;
 export function loadBookFont() {
@@ -20,7 +20,7 @@ export function createInkLayer(page, index, scale, paperHeight) {
   canvas.width = Math.round(TYPE.width * scale); canvas.height = Math.round(TYPE.height * scale);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.scale(scale, scale); ctx.font = BOOK_FONT; ctx.fontKerning = 'normal';
-  ctx.fillStyle = ctx.strokeStyle = '#10100f'; ctx.textBaseline = 'alphabetic'; ctx.lineWidth = .16;
+  ctx.fillStyle = ctx.strokeStyle = '#10100f'; ctx.textBaseline = 'alphabetic'; ctx.lineWidth = .12;
   // Metal type shares a baseline. The outline acquires a very small ink
   // squeeze; pressure and paper tooth then vary within each impression.
   for (const line of page.lines) for (const run of line.runs) {

@@ -114,11 +114,11 @@ test('double-click reads the book full screen without turning a page and restore
   assert.equal(await page.locator('#room').getAttribute('data-book-page'), '0');
   assert.equal(await page.locator('#book-transcript section').textContent(), passages[0]);
   assert.equal(await page.evaluate(() => [...document.fonts].some(face =>
-    face.family.replaceAll('"', '') === 'Wildfell Book Roman' && face.status === 'loaded')), true);
+    face.family.replaceAll('"', '') === 'Wildfell Book Fell' && face.status === 'loaded')), true);
   assert.ok(await page.evaluate(() => {
-    const ctx = document.createElement('canvas').getContext('2d'); ctx.font = '34px "Wildfell Book Roman"';
+    const ctx = document.createElement('canvas').getContext('2d'); ctx.font = '34px "Wildfell Book Fell"';
     return ctx.measureText('WWWWW').width > ctx.measureText('iiiii').width * 2;
-  }), 'The book must load proportional Roman type before composing the pages');
+  }), 'The book must load the proportional Fell face before composing the pages');
   assert.equal(await page.locator('#drawer-controls').isVisible(), false);
   const reader = await page.screenshot({ path: 'test-results/book-reader-desktop.png' });
   const wood = await sharp(reader).extract({ left: 12, top: 180, width: 40, height: 140 }).stats();
