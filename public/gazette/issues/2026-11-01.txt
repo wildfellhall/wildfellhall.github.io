@@ -1,12 +1,13 @@
-# Wildfell Gazette — 29 October 2026
+# Wildfell Gazette — 01 November 2026
 # Keep these section identifiers. Put prose below the blank line after byline.
 # Empty sections intentionally show only their headings on the newspaper.
-date: 2026-10-29
+date: 2026-11-01
 number: 1
 
 [article-1]
-title: Objectives of Wildfell Gazette
+title: Notice
 byline: Sanah Rajesh
+The Wildfell Gazette will begin its publication on Sunday, November 1st, thenceforth releasing one issue each and every Sunday, with papers being subject to revisions, especially in "Thought a Day" and "Miscellany" sections, across every day of the week. 
 
 [article-2]
 title:
@@ -21,7 +22,7 @@ title:
 byline: Sanah Rajesh
 
 [words-of-the-week]
-title: Abstruse Natural Words
+title: 
 byline: Sanah Rajesh
 
 [miscellaneous]
