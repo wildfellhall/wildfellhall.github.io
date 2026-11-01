@@ -22,13 +22,20 @@ Next Book(s):
 
 A Christmas Carol (and Other Tales) by Charles Dickens: Every Christmas season, I revisit A Christmas Carol in order to allow the accrued layers of life experience to integrate and resonate more thoroughly with the story of a man so thoroughly jaded by all that life entailed, for while there were ghosts to prognosticate Ebenezer Scrooge's fate, there will be no such apparitions for me, so I must, instead, find my lessons through the stories written by those more sapient than I am. 
 
-Walden and Civil Disobedience by Henry David Thoreau
+Walden and Civil Disobedience by Henry David Thoreau: I have seen, in essay prompts, standardized tests, and sundry assessments throughout my education, excerpts from either Walden or Civil Disobedience, so having read and enjoyed Thoreau's other essays with an edacious eye, the next course of action must be to read them in full. 
 
 Gulliver's Travels by Jonathan Swift: In curating my satirical comedy corpus, which is subsumed by my larger CorpusCollection repository, I found a deeper appreciation for the satirical genre, and having read a portion of Swift's oeuvre, it feels as though the most germane next step is to read Gulliver's travels as soon as I obtain a copy. 
 
 [thought-a-day]
 title:
 byline: Sanah Rajesh
+Sunday: 
+Monday: 
+Tuesday: 
+Wednesday: 
+Thursday: 
+Friday: 
+Saturday: 
 
 [words-of-the-week]
 title: Abstruse Natural Words
