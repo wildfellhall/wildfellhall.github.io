@@ -7,7 +7,7 @@ number: 1
 [article-1]
 title: Current Endeavors
 byline: Sanah Rajesh
-
+The Halloween season, for which I reluctantly created a pumpkin carving studio despite my personal abhorrence of the holiday, being lately over, I have now resolved to concentrate my efforts, and supererogation, towards my models and research, both of which require significant work to their corpuses before training may commence. 
 
 [article-2]
 title: Syntactic Differences Between Female and Male Authors: Natural Language Processing Approach and Progress
