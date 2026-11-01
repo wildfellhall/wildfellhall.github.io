@@ -5,16 +5,16 @@ date: 2026-11-01
 number: 1
 
 [article-1]
-title: Notice
+title: Current Endeavors
 byline: Sanah Rajesh
-The Wildfell Gazette will begin its publication on Sunday, November 1st, thenceforth releasing one issue each and every Sunday, with papers being subject to revisions, especially in "Thought a Day" and "Miscellany" sections, across every day of the week. 
+
 
 [article-2]
-title:
+title: Syntactic Differences Between Female and Male Authors: Natural Language Processing Approach and Progress
 byline: Sanah Rajesh
 
 [article-3]
-title:
+title: Recent Reading
 byline: Sanah Rajesh
 
 [thought-a-day]
@@ -22,7 +22,7 @@ title:
 byline: Sanah Rajesh
 
 [words-of-the-week]
-title: 
+title: Abstruse Natural Words
 byline: Sanah Rajesh
 
 [miscellaneous]
