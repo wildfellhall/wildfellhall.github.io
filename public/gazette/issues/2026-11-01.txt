@@ -19,7 +19,12 @@ byline: Sanah Rajesh
 A Sicilian Romance - Ann Ward Radcliffe
 In reading Radcliffe's A Sicilian Romance, there were two salient aspects of the novel that I continuously took note of as the story progressed: the ways in which the various natural lineaments were described in any given scene and the particularities of the style that made the story's being, in the world of the book, a historical manuscript taken from a castle falling into desuetude. For approximately a moiety of the novel, the heroine, Julia, is either absconding or taking refuge from her father and the Duke in pursuit of her hand, and, as might be expected, her paths often convey her through sylvan areas, proclivities, and other such features of nature, many of which are limned at night in a manner that has been, from my personal reading, replicated by Gothic authors innumerable times. The book's being a historical manuscript rather than something more diaristic also served, during my reading, to balance the perfervid emotions of the characters, whose amatory affections for each other seem, at first, incommensurate to their interactions and time spent together, with the knowledge that once life's ephemeral span has passed through one's fingers, all that is left are the lingering emotions, feelings, and memories. Thinking of it in this way, it should come to no great consternation that such vast proportions of time are spent in delineating Julia's thoughts as they pertain to Hippolitus, for love, when not a mere limerence or velleity belied by grandeur, will always eclipse and supersede the details of conversations and assignations. 
 Next Book(s): 
+
 A Christmas Carol (and Other Tales) by Charles Dickens: Every Christmas season, I revisit A Christmas Carol in order to allow the accrued layers of life experience to integrate and resonate more thoroughly with the story of a man so thoroughly jaded by all that life entailed, for while there were ghosts to prognosticate Ebenezer Scrooge's fate, there will be no such apparitions for me, so I must, instead, find my lessons through the stories written by those more sapient than I am. 
+
+Walden and Civil Disobedience by Henry David Thoreau
+
+Gulliver's Travels by Jonathan Swift: In curating my satirical comedy corpus, which is subsumed by my larger CorpusCollection repository, I found a deeper appreciation for the satirical genre, and having read a portion of Swift's oeuvre, it feels as though the most germane next step is to read Gulliver's travels as soon as I obtain a copy. 
 
 [thought-a-day]
 title:
