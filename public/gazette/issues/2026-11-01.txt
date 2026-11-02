@@ -29,7 +29,7 @@ Gulliver's Travels by Jonathan Swift: In curating my satirical comedy corpus, wh
 [thought-a-day]
 title:
 byline: Sanah Rajesh
-Sunday: 
+Sunday: The cultural convergence facilitated by globalization, while incontrovertibly beneficial in terms of access to different ideologies, educations, and general thought processes, is inexorable, and by the time I've grown into an adult with a town to sink my roots in, the regional accent may be a vaporous thing remembered only through the voices of the elderly and deceased. 
 Monday: 
 Tuesday: 
 Wednesday: 
@@ -42,6 +42,6 @@ title: Abstruse Natural Words
 byline: Sanah Rajesh
 
 [miscellaneous]
-title:
+title: Reflections for the Month of October
 byline: Sanah Rajesh
 
