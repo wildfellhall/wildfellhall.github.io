@@ -40,6 +40,15 @@ Saturday:
 [words-of-the-week]
 title: Abstruse Natural Words
 byline: Sanah Rajesh
+dumose - (adj) filled with bushes or growing in a bush-like manner
+suffruticose - (adj) of a plant, such as lavender, with a woody/perennial base and herbaceous top
+pruinose - (adj) covered with a fine, waxy layer resembling hoarfrost 
+serotinous - (adj) of plants that remain closed with delayed seed dissemination, often requiring fire to open up
+silvicolous - (adj) living, growing, or inhabiting the woodlands
+uliginose - (adj) slimy or growing in swamp or marsh-like area
+umbelliferous - (adj) bearing umbels, or small flowers spreading from a common center
+
+
 
 [miscellaneous]
 title: Reflections for the Month of October
